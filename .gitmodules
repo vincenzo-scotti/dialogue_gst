@@ -1,0 +1,3 @@
+[submodule "tts_mellotron_api"]
+	path = tts_mellotron_api
+	url = https://github.com/vincenzo-scotti/tts_mellotron_api.git
