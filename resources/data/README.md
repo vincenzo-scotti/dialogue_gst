@@ -3,7 +3,7 @@
 This directory is used to host the data set(s).
 Data set(s) are available at the following links:
 
-- [IEMOCAP](https://doi.org/10.1007/s10579-008-9076-6): hosted by [University of Southern California](), available under request ([website link](https://sail.usc.edu/iemocap/iemocap_release.htm))
+- [IEMOCAP](https://doi.org/10.1007/s10579-008-9076-6): hosted by the [Signal Analysis and Interpretation Laboratory](https://sail.usc.edu) (SAIL) of the [University of Southern California](https://www.usc.edu) (USC), available under request ([website link](https://sail.usc.edu/iemocap/iemocap_release.htm))
 
 Directory structure:
 ```

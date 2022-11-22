@@ -57,12 +57,12 @@ export PYTHONPATH=$PYTHONPATH:/path/to/gsttransformer/tts_mellotron_api/tacotron
 
 There is a script to train or fine-tune the model, it expects to have `./src` in the Python path and all data sets to be downloaded and placed in the `./resources/data/raw/` directory.
 
-To train or fine-tune the model run:
+To train the model run:
 ```bash
 python ./src/bin/train_gsttransformer.py --config_file_path ./resources/configs/path/to/config.yaml
 ```
 
-To train or fine-tune the model in background run:
+To train the model in background run:
 
 ```bash
 nohup python ./src/bin/train_gsttransformer.py --config_file_path ./resources/configs/path/to/config.yaml > experiment_"$(date '+%Y_%m_%d_%H_%M_%S')".out &
@@ -86,13 +86,11 @@ Finally, connect to http://127.0.0.1:16006 on your local machine
 
 ## Evaluation
 
-There is a notebook for interactive evaluation ([link]()). 
-Please read carefully the instructions about models to correctly load all weights ([link]())
+TBD
 
 ## References
 
 If you are willing to use our code or our models, please cite our work through the following BibTeX entry:
-
 ```bibtex
 
 ```
