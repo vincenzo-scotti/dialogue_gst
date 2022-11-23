@@ -47,6 +47,8 @@ class GSTTCorpus(Dataset):
             reload_cache: bool = False,
             max_context_length: Optional[int] = None,
             max_response_length: Optional[int] = None,
+            response_prefix_token: Optional[str] = None,
+            response_suffix_token: Optional[str] = None,
             gst_embeds: bool = True,
             gst_scores: bool = True,
             in_mem: int = 1,
@@ -71,6 +73,9 @@ class GSTTCorpus(Dataset):
         # Max lengths
         self.max_context_length: Optional[int] = max_context_length
         self.max_response_length: Optional[int] = max_response_length
+        # Special tokens
+        self.response_prefix_token: Optional[str] = response_prefix_token if response_prefix_token is not None else ''
+        self.response_suffix_token: Optional[str] = response_suffix_token if response_suffix_token is not None else self.tokenizer.eos_token
         # Speech
         # Model
         self.mellotron, self.mellotron_stft, self.mellotron_hparams = load_tts(tts_model)
@@ -216,14 +221,14 @@ class GSTTCorpus(Dataset):
             # Prepare inputs depending on context embedding approach
             input_encodings = self.tokenizer([
                 ('' if self.encoding_mode == EncodingMode.RESPONSE_ONLY else sample.context['context']) +
-                sample['utterance'] + self.tokenizer.eos_token
+                self.response_prefix_token + sample['utterance'] + self.response_suffix_token
                 for sample in mini_batch
             ], return_tensors='pt', padding=True).to(self.device)
             # Prepare valid positions maks
             valid_mask = input_encodings.attention_mask.bool()
             if self.encoding_mode == EncodingMode.RESPONSE_FROM_CONTEXT:
-                for b_idx, (seq, valid) in enumerate(zip(input_encodings.input_ids, valid_mask)):
-                    valid_mask[:torch.where((seq == self.tokenizer.eos_token_id) & valid)[0][-2]] = False
+                for b_idx, sample in enumerate(mini_batch):
+                    valid_mask[:len(self.tokenizer(sample.context['context']).input_ids)] = False
             # Compute embeddings
             hidden = self.model(**input_encodings).last_hidden_state
             # Retrieve resulting embeddings
