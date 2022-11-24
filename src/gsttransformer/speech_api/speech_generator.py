@@ -30,7 +30,7 @@ class ChatSpeechGenerator:
         # Tokenizer
         tokenizer = tokenizer if tokenizer is not None else (gpt2 if isinstance(gpt2, str) else self.gpt2.config._name_or_path)
         self.tokenizer: GPT2Tokenizer = GPT2Tokenizer.from_pretrained(tokenizer) if isinstance(tokenizer, str) else tokenizer
-        # Conditioned speech synthesis model
+        # Conditioned speech synthesis gpt2
         if mellotron is not None:
             if isinstance(mellotron, str):
                 self.mellotron, self.mellotron_stft, self.mellotron_hparams = load_tts(mellotron)
@@ -38,7 +38,7 @@ class ChatSpeechGenerator:
                 self.mellotron, self.mellotron_stft, self.mellotron_hparams = mellotron
         else:
             self.mellotron = self.mellotron_stft = self.mellotron_hparams = None
-        # Raw TTS model
+        # Raw TTS gpt2
         if tacotron2 is not None:
             if isinstance(tacotron2, str):
                 self.tacotron2, self.tacotron2_stft, self.tacotron2_hparams = load_tts(tacotron2, model='tacotron2')
@@ -82,7 +82,7 @@ class ChatSpeechGenerator:
         # Other low level settings
         self.device: torch.device = device if device is not None else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.mixed_precision: bool = mixed_precision and self.device.type == 'cuda'
-        # Load internal neural network model for text analysis
+        # Load internal neural network gpt2 for text analysis
         self.gpt2 = self.gpt2.to(device)
 
     def __call__(self, *args, **kwargs):
