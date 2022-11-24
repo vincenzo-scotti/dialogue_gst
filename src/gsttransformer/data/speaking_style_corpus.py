@@ -17,7 +17,7 @@ from transformers import GPT2Tokenizer, GPT2Model
 
 from mellotron_api import load_tts, get_gst_scores, get_gst_embeddings
 
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Union
 
 CORPORA: Dict = {
     IEMOCAP.CORPUS_ID: IEMOCAP
@@ -35,9 +35,9 @@ class GSTTCorpus(Dataset):
     def __init__(
             self,
             corpora_dir_path: str,
-            text_model: str,
-            tokenizer: str,
-            tts_model: str,
+            gpt2: Union[str, GPT2Model],
+            tokenizer: Union[str, GPT2Tokenizer],
+            mellotron: Union[str, Tuple],
             data_set_split: str,
             cache_dir_path: str,
             encoding_mode: str,
@@ -53,6 +53,7 @@ class GSTTCorpus(Dataset):
             gst_scores: bool = True,
             in_mem: int = 1,
             device: Optional[torch.device] = None,
+            mixed_precision: bool = True,
             concurrent_backend: str = 'threading',
             n_jobs: int = -1,
             verbosity_level: int = 2,
@@ -64,11 +65,12 @@ class GSTTCorpus(Dataset):
         self.device: torch.device = device if device is not None else torch.device(
             'cuda' if torch.cuda.is_available() else 'cpu'
         )
+        self.mixed_precision: bool = mixed_precision
         # Text
         # Model
-        self.model: GPT2Model = GPT2Model.from_pretrained(text_model)
+        self.gpt2: GPT2Model = GPT2Model.from_pretrained(gpt2) if isinstance(gpt2, str) else gpt2
         # Tokeniser to prepare inputs
-        self.tokenizer: GPT2Tokenizer = GPT2Tokenizer.from_pretrained(tokenizer)
+        self.tokenizer: GPT2Tokenizer = GPT2Tokenizer.from_pretrained(tokenizer) if isinstance(tokenizer, str) else tokenizer
         self.tokenizer.pad_token = self.tokenizer.eos_token
         # Max lengths
         self.max_context_length: Optional[int] = max_context_length
@@ -78,13 +80,13 @@ class GSTTCorpus(Dataset):
         self.response_suffix_token: Optional[str] = response_suffix_token if response_suffix_token is not None else self.tokenizer.eos_token
         # Speech
         # Model
-        self.mellotron, self.mellotron_stft, self.mellotron_hparams = load_tts(tts_model)
+        self.mellotron, self.mellotron_stft, self.mellotron_hparams = load_tts(mellotron) if isinstance(mellotron, str) else mellotron
         # Data
         # Data split identifier
         self.data_set_split: DataSetSplit = DataSetSplit(data_set_split)
         # Encoding mode
         self.encoding_mode: EncodingMode = EncodingMode(encoding_mode)
-        # Path to corpus data frame
+        # Path to corpora data frame
         self.corpus_cache_file_path: str = os.path.join(cache_dir_path, f'{corpus_prefix}_{data_set_split}.pbz2')
         # Data
         self.data: List[Dict]
@@ -103,7 +105,7 @@ class GSTTCorpus(Dataset):
                 os.mkdir(cache_dir_path)
             #
             self.corpora_dir_path: str = corpora_dir_path
-            # Get corpus list ad list of all available corpora if not provided
+            # Get corpora list ad list of all available corpora if not provided
             if corpus_list is None:
                 self.corpus_list: List[str] = [
                     dir_name for dir_name in os.listdir(corpora_dir_path)
@@ -200,19 +202,19 @@ class GSTTCorpus(Dataset):
         with bz2.BZ2File(self.corpus_cache_file_path, 'w') as f:
             pickle.dump(self.data, f)
         # Generate and cut contexts and responses # NOTE this is not part of the cache
-        self._compute_contextual_embeddings()
+        with torch.no_grad(), torch.autocast(self.device.type, enabled=self.mixed_precision):
+            self._compute_contextual_embeddings()
 
     def _load_data_cache(self):
         # Load compressed pickle file
         with bz2.BZ2File(self.corpus_cache_file_path, 'r') as f:
             self.data = pickle.load(f)
         # Generate and cut contexts and responses # NOTE this is not part of the cache
-        self._compute_contextual_embeddings()
+        with torch.no_grad(), torch.autocast(self.device.type, enabled=self.mixed_precision):
+            self._compute_contextual_embeddings()
 
     @torch.no_grad()
     def _compute_contextual_embeddings(self):
-        # Move model to device
-        self.model.to(self.device)
         # Iterate over mini batches
         for s_idx in range(len(self.data)):
             e_idx = min(len(self.data), s_idx + self.in_mem)
@@ -230,7 +232,7 @@ class GSTTCorpus(Dataset):
                 for b_idx, sample in enumerate(mini_batch):
                     valid_mask[:len(self.tokenizer(sample.context['context']).input_ids)] = False
             # Compute embeddings
-            hidden = self.model(**input_encodings).last_hidden_state
+            hidden = self.gpt2(**input_encodings).last_hidden_state
             # Retrieve resulting embeddings
             for batch_idx, data_idx in enumerate(range(s_idx, e_idx)):
                 self.data[data_idx]['embeddings'] = hidden[batch_idx, valid_mask[batch_idx]].cpu()
