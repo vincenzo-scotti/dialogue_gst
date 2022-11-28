@@ -32,8 +32,18 @@ class GSTTBlock(nn.Module):
     ) -> Union[Tuple[torch.Tensor], Optional[Tuple[torch.Tensor, Tuple[torch.FloatTensor, ...]]]]:
         # Prepare dummy decoder hidden states
         pooling_hidden_states = torch.ones(
-            (hidden_states.size(0), self.n_out, self.hidden_size), dtype=hidden_states, device=hidden_states.device
+            (hidden_states.size(0), self.n_out, self.hidden_size), dtype=hidden_states.dtype, device=hidden_states.device
         )
+        # Prepare attention mask
+        attention_mask = attention_mask[:, None, None, :].to(dtype=hidden_states.dtype)  # fp16 compatibility
+        if hidden_states.dtype == torch.float16:
+            attention_mask = (1.0 - attention_mask) * -1e4
+        elif hidden_states.dtype in [torch.bfloat16, torch.float32]:
+            attention_mask = (1.0 - attention_mask) * -1e9
+        else:
+            raise ValueError(
+                f"{hidden_states.dtype} not recognized. `dtype` should be set to either `torch.float32` or `torch.float16`"
+            )
         # Apply attention pooling as a cross attention
         attn_pooling_outputs = self.attn_pooling(
             pooling_hidden_states,
@@ -73,15 +83,15 @@ class GSTTransformer(nn.Module):
         self.gst_embeds_size: Optional[int] = gst_embeds_size
         self.gst_scores_shape: Optional[Tuple[int, int]] = gst_scores_shape
         # Attention pooling block
-        self.h = GSTTBlock(int() + int(), config)
+        self.h = GSTTBlock(int(gst_embeds_size is not None) + int(gst_scores_shape is not None), config)
         # Last layer norm
-        self.ln_f = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_epsilon)
+        self.ln_f = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_epsilon)
         # Heads
         self.gst_embeds_head = nn.Linear(
             config.hidden_size, self.gst_embeds_size
         ) if self.gst_embeds_size is not None else None
         self.gst_scores_head = nn.Linear(
-            config.hidden_size, sum(self.gst_scores_shape)
+            config.hidden_size, self.gst_scores_shape[0] * self.gst_scores_shape[1]
         ) if self.gst_scores_shape is not None else None
 
     def forward(self, input_embeds, attention_mask, use_cache: Optional[bool] = False, **kwargs):
@@ -90,10 +100,11 @@ class GSTTransformer(nn.Module):
         hidden_states = hidden_outputs[0].squeeze(1)
         # Apply last normalisation
         hidden_states = self.ln_f(hidden_states)
+
         # Compute outputs
         outputs = {
             'gst_embeds': self.gst_embeds_head(hidden_states[:, 0]) if self.gst_embeds_head is not None else None,
-            'gst_scores': self.gst_embeds_head(hidden_states[:, -1]).reshape(
+            'gst_scores': self.gst_scores_head(hidden_states[:, -1]).reshape(
                 -1, *self.gst_scores_shape
             ) if self.gst_scores_head is not None else None,
             'cache': hidden_outputs if use_cache else None

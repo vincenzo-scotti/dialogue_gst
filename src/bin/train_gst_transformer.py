@@ -46,10 +46,10 @@ best_validation_score: float = float('inf')
 model_config_map: Dict[str, Dict] = dict()
 # Current
 model_configs: Dict = dict()
-gpt2: GPT2Model
-tokenizer: GPT2Tokenizer
-mellotron: Tuple
-gstt: GSTTransformer
+gpt2: GPT2Model = None
+tokenizer: GPT2Tokenizer = None
+mellotron: Tuple = None
+gstt: GSTTransformer = None
 # Data
 # Steps
 corpus_config_map: Dict[str, Dict] = dict()
@@ -59,7 +59,7 @@ corpora: Dict[DataSetSplit, GSTTCorpus] = dict()
 corpus_loaders: Dict[DataSetSplit, DataLoader] = dict()
 # Optimisation
 # Steps
-loss_configs_map: Dict[str, Dict]
+loss_configs_map: Dict[str, Dict] = dict()
 optimizer_configs_map: Dict[str, Dict] = dict()
 lr_scheduler_configs_map: Dict[str, Optional[Dict]] = dict()
 evaluation_configs_map: Dict[str, Dict] = dict()
@@ -103,7 +103,7 @@ def init_environment(config_file_path: str):
         f.seek(0)
         configs: Dict = yaml.full_load(f)
     # Get list of selected steps
-    training_configs = [config for config in configs['training_congfigs']]
+    training_configs = [config for config in configs['training_configs']]
     # Create directories
     # Main
     experiments_dir_path: str = mkd(configs['experiments_directory_path'])
@@ -154,7 +154,7 @@ def init_environment(config_file_path: str):
     # Load remaining configs
     for config in training_configs:
         model_config_map[config] = configs[config]['model']
-        corpus_config_map[config] = configs[config]['loss']
+        corpus_config_map[config] = configs[config]['data']
         loss_configs_map[config] = configs[config].get('loss', dict())
         optimizer_configs_map[config] = configs[config]['optimizer']
         lr_scheduler_configs_map[config] = configs[config].get('lr_scheduler')
@@ -178,15 +178,15 @@ def init_model():
     # Declare global variables
     global gpt2, tokenizer, mellotron, gstt
     # Create GPT2 and Tokenizer instance
-    gpt2 = model_configs['lm']['gpt2'].to(device)
-    tokenizer = model_configs['lm']['tokenizer']
+    gpt2 = GPT2Model.from_pretrained(model_configs['lm']['gpt2']).eval().to(device)
+    tokenizer = GPT2Tokenizer.from_pretrained(model_configs['lm']['tokenizer'], pad_token='<|endoftext|>')
     logging.info(f"GPT2 and Tokenizer instantiated and moved to device: {device}")
     # Create mellotron instance (if not already available)
     mellotron = load_tts(model_configs['tts'], device=torch.device('cpu')) if mellotron is None else mellotron
     logging.info("Mellotron instantiated")
     # Create GSTT instance
     gstt = GSTTransformer(
-        gpt2.configs,
+        gpt2.config,
         mellotron[0].gst.stl.attention.num_units,
         (mellotron[0].gst.stl.attention.num_heads, mellotron[0].gst.stl.embed.size(0))
     ).to(device)
@@ -243,7 +243,7 @@ def init_optimisation_tools():
     global lr_scheduler_configs, optimizer, lr_scheduler, scaler
     # Create optimiser instance
     optimizer = torch.optim.AdamW(
-        params=model.parameters(), **optimizer_configs['kwargs']
+        params=gstt.parameters(), **optimizer_configs['kwargs']
     )
     logging.info(f"Optimiser instantiated (ID: {config_id})")
     # Create learning rate scheduler instance if required
@@ -251,9 +251,11 @@ def init_optimisation_tools():
         # Get total number of misc steps
         steps = len(corpus_loaders[DataSetSplit('train')]) * optimizer_configs['n_epochs'] + 1
         # Update learning rate scheduler configs with missing info
-        lr_scheduler_configs[config_id]['lr_steps'] = steps
-        lr_scheduler[config_id] = LinearLR(optimizer, **lr_scheduler_configs)
+        lr_scheduler_configs['lr_steps'] = steps
+        lr_scheduler = LinearLR(optimizer, **lr_scheduler_configs)
         logging.info(f"Learning rate scheduler instantiated (ID: {config_id})")
+    else:
+        lr_scheduler = None
 
     # Create scaler if using mixed precision
     if mixed_precision:
@@ -288,8 +290,6 @@ def set_env():
     # Checkpoint paths
     model_checkpoint_path = model_checkpoint_path_map[config_id]
     best_model_checkpoint_path = best_model_checkpoint_path_map[config_id]
-    # Remove old model (if any)
-    del model
     # Empty CUDA cache
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -299,17 +299,22 @@ def process_mini_batch(
         split: str, input_embeds, attention_mask, gst_embeddings, gst_scores
 ):
     # Declare global variables
-    global model, corpus_loaders, scaler
     # Compute helper params
     in_mem: int = corpus_configs['splits'][split]['in_mem']
     # Loss accumulators
-    rmse_loss = torch.tensor(0., device=device)
-    kl_div_loss = torch.tensor(0., device=device)
+    mse_loss = torch.tensor(0., device=device) if gstt.training else torch.empty(0, device=device)
+    kl_div_loss = torch.tensor(0., device=device) if gstt.training else torch.empty(0, device=device)
     # Number elements in batch
     n_samples = input_embeds.size(0)
     # Losses weights
-    w_rmse = loss_configs.get('rmse_weight', 1.0)
+    w_mse = loss_configs.get('mse_weight', 1.0)
     w_kl = loss_configs.get('kl_weight', 1.0)
+
+    # Move tensors to devices
+    input_embeds = input_embeds.to(device)
+    attention_mask = attention_mask.to(device)
+    gst_embeddings = gst_embeddings.to(device)
+    gst_scores = gst_scores.to(device)
 
     logging.debug('Processing mini-batch')
     # Loop over sub_batches to fit in memory
@@ -317,14 +322,10 @@ def process_mini_batch(
     for s_idx, e_idx in idxs:
         with torch.autocast(device.type, enabled=mixed_precision):
             # Process current elements
-            outputs = model(
-                input_ids=input_embeds[s_idx:e_idx],
-                attention_mask=attention_mask[s_idx:e_idx],
-                use_cache=not (model.training and model.transformer.gradient_checkpointing)
-            )
+            outputs = gstt(input_embeds[s_idx:e_idx], attention_mask[s_idx:e_idx])
             # Compute losses
-            if model.training:
-                tmp_rmse_loss = F.mse_loss(outputs['gst_embeds'], gst_embeddings)
+            if gstt.training:
+                tmp_mse_loss = F.mse_loss(outputs['gst_embeds'], gst_embeddings)
                 tmp_kl_div_loss = F.kl_div(
                     F.log_softmax(outputs['gst_scores'], -1).view(-1, gst_scores.size(-1)),
                     gst_scores.log().view(-1, gst_scores.size(-1)),
@@ -332,7 +333,7 @@ def process_mini_batch(
                     log_target=True
                 )
             else:
-                tmp_rmse_loss = F.mse_loss(outputs['gst_embeds'], gst_embeddings, reduction='none').mean(-1)
+                tmp_mse_loss = F.mse_loss(outputs['gst_embeds'], gst_embeddings, reduction='none').mean(-1)
                 tmp_kl_div_loss = F.kl_div(
                     F.log_softmax(outputs['gst_scores'], -1),
                     gst_scores.log(),
@@ -340,36 +341,36 @@ def process_mini_batch(
                     log_target=True
                 ).sum(-1).mean(1)
             # Scale loss if using gradient accumulation (only in training)
-            if model.training:
-                tmp_rmse_loss = tmp_rmse_loss * (e_idx - s_idx) / n_samples
+            if gstt.training:
+                tmp_mse_loss = tmp_mse_loss * (e_idx - s_idx) / n_samples
                 tmp_kl_div_loss = tmp_kl_div_loss * (e_idx - s_idx) / n_samples
 
-                tmp_loss = w_rmse * tmp_rmse_loss + w_kl * tmp_kl_div_loss
+                tmp_loss = w_mse * tmp_mse_loss + w_kl * tmp_kl_div_loss
         # Compute gradients if gpt2 is training
-        if model.training:
+        if gstt.training:
             # Compute gradients
             if scaler is not None:
                 scaler.scale(tmp_loss).backward()
             else:
                 tmp_loss.backward()
         # Accumulate losses
-        if model.training:
-            rmse_loss += tmp_rmse_loss.detach()
+        if gstt.training:
+            mse_loss += tmp_mse_loss.detach()
             kl_div_loss += tmp_kl_div_loss.detach()
         else:
-            rmse_loss = torch.hstack([rmse_loss, tmp_rmse_loss])
+            mse_loss = torch.hstack([mse_loss, tmp_mse_loss])
             kl_div_loss = torch.hstack([kl_div_loss, tmp_kl_div_loss])
     # Compute total loss
-    loss = (w_rmse * rmse_loss) + (w_kl * kl_div_loss)
+    loss = (w_mse * mse_loss) + (w_kl * kl_div_loss)
     logging.debug('Processing complete')
 
-    if model.training:
+    if gstt.training:
         # Clip gradient norm
         if optimizer_configs['max_gradient_norm'] > 0.0:
             if scaler is not None:
                 scaler.unscale_(optimizer)
             # Clip gradient norm
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=optimizer_configs['max_gradient_norm'])
+            torch.nn.utils.clip_grad_norm_(gstt.parameters(), max_norm=optimizer_configs['max_gradient_norm'])
         # Update weights
         if scaler is not None:
             scaler.step(optimizer)
@@ -380,12 +381,12 @@ def process_mini_batch(
         if lr_scheduler is not None:
             lr_scheduler.step()
         # Reset optimiser and gpt2 gradients
-        for param in model.parameters():
+        for param in gstt.parameters():
             param.grad = None
 
     # Generate losses dict
     losses = {
-        'MSE loss': rmse_loss, 'KL-Divergence loss': kl_div_loss, 'Loss': loss
+        'MSE loss': mse_loss, 'KL-Divergence loss': kl_div_loss, 'Loss': loss
     }
 
     return losses
@@ -400,9 +401,9 @@ def process_evaluation(
 
     # Initialize validation accumulator
     validation_loss = {
-        'MSE loss': torch.tensor(0., device=device),
-        'KL-Divergence loss': torch.tensor(0., device=device),
-        'Loss': torch.tensor(0., device=device)
+        'MSE loss': torch.empty(0, device=device),
+        'KL-Divergence loss': torch.empty(0, device=device),
+        'Loss': torch.empty(0, device=device)
     }
     # Iterate over validation mini batches
     for b_idx, mini_batch in enumerate(corpus_loaders[DataSetSplit(split)]):
@@ -415,7 +416,7 @@ def process_evaluation(
     validation_loss = {key: values.mean() for key, values in validation_loss.items()}
     # Log values
     for key, value in validation_loss.items():
-        writer.add_scalar(f'{config_id.capitalize()}/{key}/{tag}', value.cpu().item(), global_step=global_step_idx)
+        writer.add_scalar(f'{config_id.upper()}/{key}/{tag}', value.cpu().item(), global_step=global_step_idx)
 
     # If this is the standard validation process check for best gpt2
     if best_validation_score is not None:
@@ -434,7 +435,7 @@ def process_evaluation(
                         f"\tLoss: {validation_loss['Loss']:.4f}\n" \
                         f"\tMSE loss: {validation_loss['MSE loss']:.4f}\n" \
                         f"\tKL-Divergence loss: {validation_loss['KL-Divergence loss']:.4f}\n"
-        writer.add_text(f'Final report/{split}', f"<pre>{output_report}</pre>")
+        writer.add_text(f'{config_id.upper()}/Final report/{split}', f"<pre>{output_report}</pre>")
 
         return output_report
 
@@ -537,7 +538,7 @@ def fit_model():
 
 def evaluate_model():
     # Declare global variables
-    global writer
+    global writer, gstt
     # Start evaluation
     # Get current date and time
     start_time: datetime = datetime.now()
@@ -556,7 +557,7 @@ def evaluate_model():
     # Print test results
     print(validation_report)
     # Log test results in TensorBoard
-    writer.add_text('Validation set evaluation results', validation_report)
+    writer.add_text(f'{config_id.upper()}/Validation set evaluation results', validation_report)
     # Log start on test set
     logging.info(f"Test set evaluation started")
     # Compute summary report on test set
@@ -567,13 +568,15 @@ def evaluate_model():
     # Print test results
     print(test_report)
     # Log test results in TensorBoard
-    writer.add_text('Test set evaluation results', test_report)
+    writer.add_text(f'{config_id.upper()}/Test set evaluation results', test_report)
     # Close evaluation
     # Get current date and time
     end_time: datetime = datetime.now()
     # Log end of evaluation
     logging.info(f"Evaluation finished - Current date and time {end_time} - (ID {config_id})")
     logging.info(f"Elapsed time {end_time - start_time}")
+    # Remove trained model
+    del gstt
 
 
 def main(args: Namespace):

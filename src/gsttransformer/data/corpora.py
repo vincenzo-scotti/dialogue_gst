@@ -1,5 +1,8 @@
 import os
 
+import math
+import random
+
 from joblib import Parallel
 from joblib import delayed
 from joblib import parallel_backend
@@ -33,6 +36,7 @@ class IEMOCAP(Dataset):
             concurrent_backend: str = 'threading',
             n_jobs: int = -1,
             verbosity_level: int = 2,
+            sample: Optional[Union[int, float]] = None,
             **kwargs
     ):
         super(IEMOCAP, self).__init__()
@@ -63,6 +67,12 @@ class IEMOCAP(Dataset):
             idxs = test_idxs
         else:
             raise ValueError(f"Unsupported data split: {self.data_set_split.value}")
+        # Subsampling
+        sample = sample if sample is not None else 1.0
+        self.sample: int = sample if isinstance(sample, int) else int(math.ceil(sample * len(idxs)))
+        # Apply sampling if required
+        if self.sample < len(idxs):
+            idxs = random.sample(idxs, self.sample)
         # Parallelisation options
         self.parallel_backend: str = concurrent_backend
         self.n_jobs: int = n_jobs

@@ -27,11 +27,6 @@ CORPORA: Dict = {
 # TODO move here context cutting, it shouldn't be part of the corpora loaders
 # TODO add class for fine tuning
 class GSTTCorpus(Dataset):
-    tts_model = None
-    tts_configs = None
-    tts_ap = None
-    se_model_loaded: bool = False
-
     def __init__(
             self,
             corpora_dir_path: str,
@@ -188,7 +183,7 @@ class GSTTCorpus(Dataset):
         self.data = [sample for dialogue in self.data for sample in dialogue]
         # Compute GST vectors
         for sample in self.data:
-            sample['gst_embeddings'], = get_gst_embeddings(
+            sample['gst_embeddings'] = get_gst_embeddings(
                 os.path.join(self.corpora_dir_path, sample['audio_file_path']),
                 self.mellotron, self.mellotron_stft, self.mellotron_hparams
             )
@@ -196,7 +191,7 @@ class GSTTCorpus(Dataset):
         for sample in self.data:
             sample['gst_scores'] = get_gst_scores(
                 os.path.join(self.corpora_dir_path, sample['audio_file_path']),
-                self.tts_model, self.tts_configs, self.tts_ap
+                self.mellotron, self.mellotron_stft, self.mellotron_hparams
             )
         # Save compressed pickle file
         with bz2.BZ2File(self.corpus_cache_file_path, 'w') as f:
@@ -222,7 +217,7 @@ class GSTTCorpus(Dataset):
             mini_batch = [self.data[data_idx] for data_idx in range(s_idx, e_idx)]
             # Prepare inputs depending on context embedding approach
             input_encodings = self.tokenizer([
-                ('' if self.encoding_mode == EncodingMode.RESPONSE_ONLY else sample.context['context']) +
+                ('' if self.encoding_mode == EncodingMode.RESPONSE_ONLY else sample['context']) +
                 self.response_prefix_token + sample['utterance'] + self.response_suffix_token
                 for sample in mini_batch
             ], return_tensors='pt', padding=True).to(self.device)
@@ -230,25 +225,25 @@ class GSTTCorpus(Dataset):
             valid_mask = input_encodings.attention_mask.bool()
             if self.encoding_mode == EncodingMode.RESPONSE_FROM_CONTEXT:
                 for b_idx, sample in enumerate(mini_batch):
-                    valid_mask[:len(self.tokenizer(sample.context['context']).input_ids)] = False
+                    valid_mask[:len(self.tokenizer(sample['context']).input_ids)] = False
             # Compute embeddings
             hidden = self.gpt2(**input_encodings).last_hidden_state
             # Retrieve resulting embeddings
             for batch_idx, data_idx in enumerate(range(s_idx, e_idx)):
-                self.data[data_idx]['embeddings'] = hidden[batch_idx, valid_mask[batch_idx]].cpu()
+                self.data[data_idx]['embeddings'] = hidden[batch_idx, valid_mask[batch_idx]].unsqueeze(0).cpu()
 
     def collate(self, mini_batch) -> Tuple[torch.tensor, torch.tensor, torch.tensor, torch.tensor]:
         # Get max length for padding
-        max_len = max(sample['embeddings'].size(-1) for sample in mini_batch)
+        max_len = max(sample['embeddings'].size(1) for sample in mini_batch)
         # Create batch with current embeddings
         input_embeds = torch.vstack([
-            F.pad(sample['embeddings'], (0, max_len - sample['embeddings'].size(-1)), value=self.tokenizer.pad_token_id)
-            for sample in mini_batch
+            F.pad(sample['embeddings'], (0, 0, 0, max_len - sample['embeddings'].size(1))) for sample in mini_batch
         ])
         # Get attention mask
-        attention_mask = torch.vstack([
-            F.pad(sample['attention_mask'], (0, max_len - sample['attention_mask'].size(-1))) for sample in mini_batch
-        ])
+        attention_mask = torch.vstack([F.pad(
+            torch.ones((len(mini_batch), sample['embeddings'].size(1)), dtype=torch.long),
+            (0, max_len - sample['embeddings'].size(1))
+        ) for sample in mini_batch])
         # GST embeddings
         gst_embeddings = torch.tensor([sample['gst_embeddings'] for sample in mini_batch]) if self.gst_embeds else None
         # GST scores

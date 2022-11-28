@@ -11,6 +11,6 @@ class DataSetSplit(Enum):
 
 
 class EncodingMode(Enum):
-    RESPONSE_AND_CONTEXT: str = 'respandctx'
+    RESPONSE_AND_CONTEXT: str = 'ctx_resp'
     RESPONSE_ONLY: str = 'resp'
-    RESPONSE_FROM_CONTEXT: str = 'respfromctx'
+    RESPONSE_FROM_CONTEXT: str = 'resp_from_ctx'

@@ -8,7 +8,7 @@ mixed_precision: &mixed_precision true
 log_level: DEBUG
 log_file: true
 
-training_congfigs:
+training_configs:
   - lm_small_resp
   - lm_small_resp_from_ctx
   - lm_small_ctx_resp
@@ -25,15 +25,15 @@ lm_small_resp:
     lm:
       gpt2: microsoft/DialoGPT-small
       tokenizer: microsoft/DialoGPT-small
-    tts: &tts ./resources/tts/mellotron/mellotron_libritts.pt
+    tts: &tts ./resources/models/mellotron/mellotron_libritts.pt
   # Data
   data:
     corpora_dir_path: &corpus_dir ./resources/data/raw/
     cache_dir_path: &cache_dir ./resources/data/cache/
     encoding_mode: &resp resp
-    kwargs:
+    kwargs: &small_data_kwargs
       corpus_list:
-        - IEMOCAP
+        - IEMOCAP_full_release
       max_context_length: 256
       max_response_length: 128
       in_mem: 32
@@ -64,7 +64,7 @@ lm_small_resp:
     warmup: 0.05
   # Loss
   # loss: &small_loss_weights {}
-    # rmse_weight: 1.0
+    # mse_weight: 1.0
     # kl_weight: 1.0
   # Evaluation
   # evaluation: &small_evaluation {}
@@ -79,12 +79,7 @@ lm_small_resp_from_ctx:
     corpora_dir_path: *corpus_dir
     cache_dir_path: *cache_dir
     encoding_mode: &resp_from_ctx resp_from_ctx
-    kwargs:
-      corpus_list:
-        - IEMOCAP
-      max_context_length: 256
-      max_response_length: 128
-      in_mem: 32
+    kwargs: *small_data_kwargs
     splits: *small_loader_configs
   # Optimizer
   optimizer: *small_optimizer
@@ -103,12 +98,7 @@ lm_small_ctx_resp:
     corpora_dir_path: *corpus_dir
     cache_dir_path: *cache_dir
     encoding_mode: &ctx_resp ctx_resp
-    kwargs:
-      corpus_list:
-        - IEMOCAP
-      max_context_length: 256
-      max_response_length: 128
-      in_mem: 48
+    kwargs: *small_data_kwargs
     splits: *small_loader_configs
   # Optimizer
   optimizer: *small_optimizer
@@ -125,23 +115,23 @@ lm_medium_resp:
     lm:
       gpt2: microsoft/DialoGPT-medium
       tokenizer: microsoft/DialoGPT-medium
-    tts: &tts ./resources/tts/mellotron/mellotron_libritts.pt
+    tts: *tts
   # Data
   data:
     corpora_dir_path: *corpus_dir
     cache_dir_path: *cache_dir
     encoding_mode: *resp
-    kwargs:
+    kwargs: &medium_data_kwargs
       corpus_list:
-        - IEMOCAP
+        - IEMOCAP_full_release
       max_context_length: 256
       max_response_length: 128
-      in_mem: 32
+      in_mem: 24
     splits: &medium_loader_configs
       train:
         mini_batch_size: &medium_train_mini_batch_size 32
         in_mem: 32
-        n_workers: &n_workers 4
+        n_workers: *n_workers
       validation:
         mini_batch_size: &medium_eval_mini_batch_size 32
         in_mem: *medium_eval_mini_batch_size
@@ -164,7 +154,7 @@ lm_medium_resp:
     warmup: 0.05
   # Loss
   # loss: &medium_loss_weights {}
-    # rmse_weight: 1.0
+    # mse_weight: 1.0
     # kl_weight: 1.0
   # Evaluation
   # evaluation: &medium_evaluation {}
@@ -179,12 +169,7 @@ lm_medium_resp_from_ctx:
     corpora_dir_path: *corpus_dir
     cache_dir_path: *cache_dir
     encoding_mode: *resp_from_ctx
-    kwargs:
-      corpus_list:
-        - IEMOCAP
-      max_context_length: 256
-      max_response_length: 128
-      in_mem: 32
+    kwargs: *medium_data_kwargs
     splits: *medium_loader_configs
   # Optimizer
   optimizer: *medium_optimizer
@@ -203,12 +188,7 @@ lm_medium_ctx_resp:
     corpora_dir_path: *corpus_dir
     cache_dir_path: *cache_dir
     encoding_mode: *ctx_resp
-    kwargs:
-      corpus_list:
-        - IEMOCAP
-      max_context_length: 256
-      max_response_length: 128
-      in_mem: 32
+    kwargs: *medium_data_kwargs
     splits: *medium_loader_configs
   # Optimizer
   optimizer: *medium_optimizer
@@ -225,15 +205,15 @@ lm_large_resp:
     lm:
       gpt2: microsoft/DialoGPT-large
       tokenizer: microsoft/DialoGPT-large
-    tts: &tts ./resources/tts/mellotron/mellotron_libritts.pt
+    tts: *tts
   # Data
   data:
     corpora_dir_path: *corpus_dir
     cache_dir_path: *cache_dir
     encoding_mode: *resp
-    kwargs:
+    kwargs: &large_data_kwargs
       corpus_list:
-        - IEMOCAP
+        - IEMOCAP_full_release
       max_context_length: 256
       max_response_length: 128
       in_mem: 16
@@ -241,7 +221,7 @@ lm_large_resp:
       train:
         mini_batch_size: &large_train_mini_batch_size 32
         in_mem: 32
-        n_workers: &n_workers 4
+        n_workers: *n_workers
       validation:
         mini_batch_size: &large_eval_mini_batch_size 32
         in_mem: *large_eval_mini_batch_size
@@ -264,7 +244,7 @@ lm_large_resp:
     warmup: 0.05
   # Loss
   # loss: &large_loss_weights {}
-    # rmse_weight: 1.0
+    # mse_weight: 1.0
     # kl_weight: 1.0
   # Evaluation
   # evaluation: &large_evaluation {}
@@ -279,12 +259,7 @@ lm_large_resp_from_ctx:
     corpora_dir_path: *corpus_dir
     cache_dir_path: *cache_dir
     encoding_mode: *resp_from_ctx
-    kwargs:
-      corpus_list:
-        - IEMOCAP
-      max_context_length: 256
-      max_response_length: 128
-      in_mem: 16
+    kwargs: *large_data_kwargs
     splits: *large_loader_configs
   # Optimizer
   optimizer: *large_optimizer
@@ -303,12 +278,7 @@ lm_large_ctx_resp:
     corpora_dir_path: *corpus_dir
     cache_dir_path: *cache_dir
     encoding_mode: *ctx_resp
-    kwargs:
-      corpus_list:
-        - IEMOCAP
-      max_context_length: 256
-      max_response_length: 128
-      in_mem: 16
+    kwargs: *large_data_kwargs
     splits: *large_loader_configs
   # Optimizer
   optimizer: *large_optimizer

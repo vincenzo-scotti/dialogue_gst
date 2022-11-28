@@ -35,7 +35,11 @@ conda create -n gstt python=3.10 cudatoolkit=11.3
 conda activate gstt
 # Install packages
 conda install pytorch=1.11.0 -c pytorch
-conda install -c conda-forge numpy=1.21 transformers=4.18.0 tensorboard=2.9.1 pandas scikit-learn librosa matplotlib seaborn jupyterlab
+conda install -c conda-forge numpy=1.21 transformers tensorboard pandas scikit-learn librosa matplotlib seaborn jupyterlab
+# Additional packages
+conda install -c conda-forge scipy=1.9.1 tensorflow music21 inflect tensorboardx unidecode pydantic=1.10.2
+conda install -c anaconda nltk pillow
+pip install jamo
 # Download and initialise TTS API submodule
 git submodule init; git submodule update
 # NOTE follow the API instructions to complete installation
@@ -59,13 +63,13 @@ There is a script to train or fine-tune the model, it expects to have `./src` in
 
 To train the model run:
 ```bash
-python ./src/bin/train_gsttransformer.py --config_file_path ./resources/configs/path/to/config.yaml
+python ./src/bin/train_gst_transformer.py --config_file_path ./resources/configs/path/to/config.yaml
 ```
 
 To train the model in background run:
 
 ```bash
-nohup python ./src/bin/train_gsttransformer.py --config_file_path ./resources/configs/path/to/config.yaml > experiment_"$(date '+%Y_%m_%d_%H_%M_%S')".out &
+nohup python ./src/bin/train_gst_transformer.py --config_file_path ./resources/configs/path/to/config.yaml > experiment_"$(date '+%Y_%m_%d_%H_%M_%S')".out &
 ```
 
 ### Monitor
