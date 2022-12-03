@@ -1,5 +1,5 @@
 experiment_series: GSTT
-experiment_id: multi_config
+experiment_id: therabot
 experiments_directory_path: ./experiments/
 
 random_seed: &random_seed 2307
@@ -17,8 +17,8 @@ lm_large_resp:
   # Models
   model: &large_model
     lm:
-      gpt2: ...
-      tokenizer: ...
+      gpt2: /home/vincenzo/Documents/dldlm/resources/models/therabot
+      tokenizer: /home/vincenzo/Documents/dldlm/resources/models/therabot
     tts: &tts ./resources/models/mellotron/mellotron_libritts.pt
   # Data
   data:
@@ -74,7 +74,7 @@ lm_large_resp_from_ctx:
   data:
     corpora_dir_path: *corpus_dir
     cache_dir_path: *cache_dir
-    encoding_mode: *resp_from_ctx
+    encoding_mode: &resp_from_ctx resp_from_ctx
     kwargs: *large_data_kwargs
     splits: *large_loader_configs
   # Optimizer
@@ -93,7 +93,7 @@ lm_large_ctx_resp:
   data:
     corpora_dir_path: *corpus_dir
     cache_dir_path: *cache_dir
-    encoding_mode: *ctx_resp
+    encoding_mode: &ctx_resp ctx_resp
     kwargs: *large_data_kwargs
     splits: *large_loader_configs
   # Optimizer
