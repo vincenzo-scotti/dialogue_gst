@@ -1,0 +1,106 @@
+experiment_series: GSTT
+experiment_id: multi_config
+experiments_directory_path: ./experiments/
+
+random_seed: &random_seed 2307
+mixed_precision: &mixed_precision true
+
+log_level: DEBUG
+log_file: true
+
+training_configs:
+  - lm_large_resp
+  - lm_large_resp_from_ctx
+  - lm_large_ctx_resp
+
+lm_large_resp:
+  # Models
+  model: &large_model
+    lm:
+      gpt2: ...
+      tokenizer: ...
+    tts: &tts ./resources/models/mellotron/mellotron_libritts.pt
+  # Data
+  data:
+    corpora_dir_path: &corpus_dir ./resources/data/raw/
+    cache_dir_path: &cache_dir ./resources/data/cache/
+    encoding_mode: &resp resp
+    kwargs: &large_data_kwargs
+      corpus_list:
+        - IEMOCAP_full_release
+      max_context_length: 256
+      max_response_length: 128
+      in_mem: 16
+    splits: &large_loader_configs
+      train:
+        mini_batch_size: &large_train_mini_batch_size 128
+        in_mem: 32
+        n_workers: &n_workers 4
+      validation:
+        mini_batch_size: &large_eval_mini_batch_size 32
+        in_mem: *large_eval_mini_batch_size
+        n_workers: *n_workers
+      test:
+        mini_batch_size: *large_eval_mini_batch_size
+        in_mem: *large_eval_mini_batch_size
+        n_workers: *n_workers
+  # Optimizer
+  optimizer: &large_optimizer
+    kwargs:
+      lr: &large_lr 1.e-7
+    n_epochs: 5
+    max_gradient_norm: 1.0
+  # LR scheduler
+  lr_scheduler: &large_scheduler
+    lr: *large_lr
+    lr_start: 0.0
+    lr_stop: 0.0
+    warmup: 0.05
+  # Loss
+  # loss: &large_loss_weights {}
+    # mse_weight: 1.0
+    # kl_weight: 1.0
+  # Evaluation
+  # evaluation: &large_evaluation {}
+    # validation_period: 100
+    # logging_period: 10
+
+lm_large_resp_from_ctx:
+  # Models
+  model: *large_model
+  # Data
+  data:
+    corpora_dir_path: *corpus_dir
+    cache_dir_path: *cache_dir
+    encoding_mode: *resp_from_ctx
+    kwargs: *large_data_kwargs
+    splits: *large_loader_configs
+  # Optimizer
+  optimizer: *large_optimizer
+  # LR scheduler
+  lr_scheduler: *large_scheduler
+  # Loss
+  # loss: *loss_weights
+  # Evaluation
+  # evaluation: *large_evaluation
+
+lm_large_ctx_resp:
+  # Models
+  model: *large_model
+  # Data
+  data:
+    corpora_dir_path: *corpus_dir
+    cache_dir_path: *cache_dir
+    encoding_mode: *ctx_resp
+    kwargs: *large_data_kwargs
+    splits: *large_loader_configs
+  # Optimizer
+  optimizer: *large_optimizer
+  # LR scheduler
+  lr_scheduler: *large_scheduler
+  # Loss
+  # loss: *loss_weights
+  # Evaluation
+  # evaluation: *large_evaluation
+
+
