@@ -28,6 +28,8 @@ lm_large_resp:
     kwargs: &large_data_kwargs
       corpus_list:
         - IEMOCAP_full_release
+      response_prefix_token: <|prior|>
+      response_suffix_token: <|posterior|>
       max_context_length: 256
       max_response_length: 128
       in_mem: 16
