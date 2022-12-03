@@ -39,7 +39,7 @@ lm_small_resp:
       in_mem: 32
     splits: &small_loader_configs
       train:
-        mini_batch_size: &small_train_mini_batch_size 32
+        mini_batch_size: &small_train_mini_batch_size 128
         in_mem: 32
         n_workers: &n_workers 4
       validation:
@@ -53,7 +53,7 @@ lm_small_resp:
   # Optimizer
   optimizer: &small_optimizer
     kwargs:
-      lr: &small_lr 5.e-5
+      lr: &small_lr 5.e-7
     n_epochs: 5
     max_gradient_norm: 1.0
   # LR scheduler
@@ -129,7 +129,7 @@ lm_medium_resp:
       in_mem: 24
     splits: &medium_loader_configs
       train:
-        mini_batch_size: &medium_train_mini_batch_size 32
+        mini_batch_size: &medium_train_mini_batch_size 128
         in_mem: 32
         n_workers: *n_workers
       validation:
@@ -143,7 +143,7 @@ lm_medium_resp:
   # Optimizer
   optimizer: &medium_optimizer
     kwargs:
-      lr: &medium_lr 2.5e-5
+      lr: &medium_lr 2.5e-7
     n_epochs: 5
     max_gradient_norm: 1.0
   # LR scheduler
@@ -219,7 +219,7 @@ lm_large_resp:
       in_mem: 16
     splits: &large_loader_configs
       train:
-        mini_batch_size: &large_train_mini_batch_size 32
+        mini_batch_size: &large_train_mini_batch_size 128
         in_mem: 32
         n_workers: *n_workers
       validation:
@@ -233,7 +233,7 @@ lm_large_resp:
   # Optimizer
   optimizer: &large_optimizer
     kwargs:
-      lr: &large_lr 1.e-5
+      lr: &large_lr 1.e-7
     n_epochs: 5
     max_gradient_norm: 1.0
   # LR scheduler
