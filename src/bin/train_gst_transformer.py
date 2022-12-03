@@ -325,18 +325,18 @@ def process_mini_batch(
             outputs = gstt(input_embeds[s_idx:e_idx], attention_mask[s_idx:e_idx])
             # Compute losses
             if gstt.training:
-                tmp_mse_loss = F.mse_loss(outputs['gst_embeds'], gst_embeddings)
+                tmp_mse_loss = F.mse_loss(outputs['gst_embeds'], gst_embeddings[s_idx:e_idx])
                 tmp_kl_div_loss = F.kl_div(
                     F.log_softmax(outputs['gst_scores'], -1).view(-1, gst_scores.size(-1)),
-                    gst_scores.log().view(-1, gst_scores.size(-1)),
+                    gst_scores[s_idx:e_idx].log().view(-1, gst_scores.size(-1)),
                     reduction='batchmean',
                     log_target=True
                 )
             else:
-                tmp_mse_loss = F.mse_loss(outputs['gst_embeds'], gst_embeddings, reduction='none').mean(-1)
+                tmp_mse_loss = F.mse_loss(outputs['gst_embeds'], gst_embeddings[s_idx:e_idx], reduction='none').mean(-1)
                 tmp_kl_div_loss = F.kl_div(
                     F.log_softmax(outputs['gst_scores'], -1),
-                    gst_scores.log(),
+                    gst_scores[s_idx:e_idx].log(),
                     reduction='none',
                     log_target=True
                 ).sum(-1).mean(1)
