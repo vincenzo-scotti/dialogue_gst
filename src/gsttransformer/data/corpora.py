@@ -20,7 +20,7 @@ from typing import List, Union, Optional, Dict, Pattern
 class IEMOCAP(Dataset):
     CORPUS_ID: str = 'IEMOCAP_full_release'
     VALID_LINE_REGEX: Pattern[str] = re.compile(
-        r'^((Ses(\d+)[MF]_(impro|script)\d+(_\d)?)_([MF])\d+) \[\d{3}\.\d{4}-\d{3}\.\d{4}\]: (.+)$'
+        r'^((Ses(\d+)[MF]_(impro|script)\d+(_?\d\d*\w*)?)_([MF])\d+) \[\d{3}\.\d{4}-\d{3}\.\d{4}\]: (.+)$'
     )
     ENTRIES = ('session_idx', 'transcript_id', 'line_id', 'session_type', 'speaker_gender', 'utterance')
     ENTRIES_IDXS = (2, 1, 0, 3, 5, 6)
