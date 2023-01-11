@@ -1,0 +1,292 @@
+experiment_series: DGST
+experiment_id: multi_config
+experiments_directory_path: ./experiments/
+
+random_seed: &random_seed 2307
+mixed_precision: &mixed_precision true
+
+log_level: DEBUG
+log_file: true
+
+training_configs:
+  - lm_small_resp
+  - lm_small_resp_from_ctx
+  - lm_small_ctx_resp
+  - lm_medium_resp
+  - lm_medium_resp_from_ctx
+  - lm_medium_ctx_resp
+  - lm_large_resp
+  - lm_large_resp_from_ctx
+  - lm_large_ctx_resp
+
+lm_small_resp:
+  # Models
+  model: &small_model
+    lm:
+      gpt2: microsoft/DialoGPT-small
+      tokenizer: microsoft/DialoGPT-small
+    tts: &tts ./resources/models/mellotron/mellotron_libritts.pt
+  # Data
+  data:
+    corpora_dir_path: &corpus_dir ./resources/data/raw/
+    cache_dir_path: &cache_dir ./resources/data/cache/
+    encoding_mode: &resp resp
+    kwargs: &small_data_kwargs
+      corpus_list:
+        - IEMOCAP_full_release
+      max_context_length: 256
+      max_response_length: 128
+      in_mem: 32
+    splits: &small_loader_configs
+      train:
+        mini_batch_size: &small_train_mini_batch_size 32
+        in_mem: 32
+        n_workers: &n_workers 4
+      validation:
+        mini_batch_size: &small_eval_mini_batch_size 32
+        in_mem: *small_eval_mini_batch_size
+        n_workers: *n_workers
+      test:
+        mini_batch_size: *small_eval_mini_batch_size
+        in_mem: *small_eval_mini_batch_size
+        n_workers: *n_workers
+  # Optimizer
+  optimizer: &small_optimizer
+    kwargs:
+      lr: &small_lr 5.e-4
+    n_epochs: 5
+    max_gradient_norm: 1.0
+  # LR scheduler
+  lr_scheduler: &small_scheduler
+    lr: *small_lr
+    lr_start: 0.0
+    lr_stop: 0.0
+    warmup: 0.05
+  # Loss
+  # loss: &small_loss_weights {}
+    # mse_weight: 1.0
+    # kl_weight: 1.0
+  # Evaluation
+  # evaluation: &small_evaluation {}
+    # validation_period: 100
+    # logging_period: 10
+
+lm_small_resp_from_ctx:
+  # Models
+  model: *small_model
+  # Data
+  data:
+    corpora_dir_path: *corpus_dir
+    cache_dir_path: *cache_dir
+    encoding_mode: &resp_from_ctx resp_from_ctx
+    kwargs: *small_data_kwargs
+    splits: *small_loader_configs
+  # Optimizer
+  optimizer: *small_optimizer
+  # LR scheduler
+  lr_scheduler: *small_scheduler
+  # Loss
+  # loss: *loss_weights
+  # Evaluation
+  # evaluation: *small_evaluation
+
+lm_small_ctx_resp:
+  # Models
+  model: *small_model
+  # Data
+  data:
+    corpora_dir_path: *corpus_dir
+    cache_dir_path: *cache_dir
+    encoding_mode: &ctx_resp ctx_resp
+    kwargs: *small_data_kwargs
+    splits: *small_loader_configs
+  # Optimizer
+  optimizer: *small_optimizer
+  # LR scheduler
+  lr_scheduler: *small_scheduler
+  # Loss
+  # loss: *loss_weights
+  # Evaluation
+  # evaluation: *small_evaluation
+
+lm_medium_resp:
+  # Models
+  model: &medium_model
+    lm:
+      gpt2: microsoft/DialoGPT-medium
+      tokenizer: microsoft/DialoGPT-medium
+    tts: *tts
+  # Data
+  data:
+    corpora_dir_path: *corpus_dir
+    cache_dir_path: *cache_dir
+    encoding_mode: *resp
+    kwargs: &medium_data_kwargs
+      corpus_list:
+        - IEMOCAP_full_release
+      max_context_length: 256
+      max_response_length: 128
+      in_mem: 24
+    splits: &medium_loader_configs
+      train:
+        mini_batch_size: &medium_train_mini_batch_size 32
+        in_mem: 32
+        n_workers: *n_workers
+      validation:
+        mini_batch_size: &medium_eval_mini_batch_size 32
+        in_mem: *medium_eval_mini_batch_size
+        n_workers: *n_workers
+      test:
+        mini_batch_size: *medium_eval_mini_batch_size
+        in_mem: *medium_eval_mini_batch_size
+        n_workers: *n_workers
+  # Optimizer
+  optimizer: &medium_optimizer
+    kwargs:
+      lr: &medium_lr 2.5e-4
+    n_epochs: 5
+    max_gradient_norm: 1.0
+  # LR scheduler
+  lr_scheduler: &medium_scheduler
+    lr: *medium_lr
+    lr_start: 0.0
+    lr_stop: 0.0
+    warmup: 0.05
+  # Loss
+  # loss: &medium_loss_weights {}
+    # mse_weight: 1.0
+    # kl_weight: 1.0
+  # Evaluation
+  # evaluation: &medium_evaluation {}
+    # validation_period: 100
+    # logging_period: 10
+
+lm_medium_resp_from_ctx:
+  # Models
+  model: *medium_model
+  # Data
+  data:
+    corpora_dir_path: *corpus_dir
+    cache_dir_path: *cache_dir
+    encoding_mode: *resp_from_ctx
+    kwargs: *medium_data_kwargs
+    splits: *medium_loader_configs
+  # Optimizer
+  optimizer: *medium_optimizer
+  # LR scheduler
+  lr_scheduler: *medium_scheduler
+  # Loss
+  # loss: *loss_weights
+  # Evaluation
+  # evaluation: *medium_evaluation
+
+lm_medium_ctx_resp:
+  # Models
+  model: *medium_model
+  # Data
+  data:
+    corpora_dir_path: *corpus_dir
+    cache_dir_path: *cache_dir
+    encoding_mode: *ctx_resp
+    kwargs: *medium_data_kwargs
+    splits: *medium_loader_configs
+  # Optimizer
+  optimizer: *medium_optimizer
+  # LR scheduler
+  lr_scheduler: *medium_scheduler
+  # Loss
+  # loss: *loss_weights
+  # Evaluation
+  # evaluation: *medium_evaluation
+
+lm_large_resp:
+  # Models
+  model: &large_model
+    lm:
+      gpt2: microsoft/DialoGPT-large
+      tokenizer: microsoft/DialoGPT-large
+    tts: *tts
+  # Data
+  data:
+    corpora_dir_path: *corpus_dir
+    cache_dir_path: *cache_dir
+    encoding_mode: *resp
+    kwargs: &large_data_kwargs
+      corpus_list:
+        - IEMOCAP_full_release
+      max_context_length: 256
+      max_response_length: 128
+      in_mem: 16
+    splits: &large_loader_configs
+      train:
+        mini_batch_size: &large_train_mini_batch_size 32
+        in_mem: 32
+        n_workers: *n_workers
+      validation:
+        mini_batch_size: &large_eval_mini_batch_size 32
+        in_mem: *large_eval_mini_batch_size
+        n_workers: *n_workers
+      test:
+        mini_batch_size: *large_eval_mini_batch_size
+        in_mem: *large_eval_mini_batch_size
+        n_workers: *n_workers
+  # Optimizer
+  optimizer: &large_optimizer
+    kwargs:
+      lr: &large_lr 1.e-4
+    n_epochs: 5
+    max_gradient_norm: 1.0
+  # LR scheduler
+  lr_scheduler: &large_scheduler
+    lr: *large_lr
+    lr_start: 0.0
+    lr_stop: 0.0
+    warmup: 0.05
+  # Loss
+  # loss: &large_loss_weights {}
+    # mse_weight: 1.0
+    # kl_weight: 1.0
+  # Evaluation
+  # evaluation: &large_evaluation {}
+    # validation_period: 100
+    # logging_period: 10
+
+lm_large_resp_from_ctx:
+  # Models
+  model: *large_model
+  # Data
+  data:
+    corpora_dir_path: *corpus_dir
+    cache_dir_path: *cache_dir
+    encoding_mode: *resp_from_ctx
+    kwargs: *large_data_kwargs
+    splits: *large_loader_configs
+  # Optimizer
+  optimizer: *large_optimizer
+  # LR scheduler
+  lr_scheduler: *large_scheduler
+  # Loss
+  # loss: *loss_weights
+  # Evaluation
+  # evaluation: *large_evaluation
+
+lm_large_ctx_resp:
+  # Models
+  model: *large_model
+  # Data
+  data:
+    corpora_dir_path: *corpus_dir
+    cache_dir_path: *cache_dir
+    encoding_mode: *ctx_resp
+    kwargs: *large_data_kwargs
+    splits: *large_loader_configs
+  # Optimizer
+  optimizer: *large_optimizer
+  # LR scheduler
+  lr_scheduler: *large_scheduler
+  # Loss
+  # loss: *loss_weights
+  # Evaluation
+  # evaluation: *large_evaluation
+
+

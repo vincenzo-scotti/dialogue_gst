@@ -2,7 +2,7 @@ import torch
 from transformers import GPT2Tokenizer, GPT2Model
 from mellotron_api import load_tts, load_vocoder, load_arpabet_dict, synthesise_speech
 
-from gsttransformer.model import GSTTransformer
+from gsttransformer.model import DGST
 
 from typing import Tuple, List, Union, Literal, Optional
 
@@ -10,7 +10,7 @@ from typing import Tuple, List, Union, Literal, Optional
 class ChatSpeechGenerator:
     def __init__(
             self,
-            gstt: Union[str, GSTTransformer],
+            gstt: Union[str, DGST],
             tokenizer: Union[str, GPT2Tokenizer],
             gpt2: Union[str, GPT2Model],
             mellotron: Optional[Union[str, Tuple]] = None,
@@ -60,7 +60,7 @@ class ChatSpeechGenerator:
         # GST predictor
         if gstt is not None and mellotron is not None:  # NOTE no point in having predictor if there is no conditioned TTS
             if isinstance(gstt, str):
-                self.gstt = GSTTransformer(
+                self.gstt = DGST(
                     self.gpt2.config,
                     self.mellotron.gst.stl.attention.num_units,
                     (self.mellotron.gst.stl.attention.num_heads, self.mellotron.gst.stl.embed.size(0))

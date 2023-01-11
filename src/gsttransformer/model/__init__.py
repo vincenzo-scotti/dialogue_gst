@@ -1,1 +1,1 @@
-from .gst_predictor import GSTTransformer
+from .gst_predictor import DGST

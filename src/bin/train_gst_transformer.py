@@ -5,10 +5,9 @@ import logging
 from datetime import datetime
 from argparse import ArgumentParser, Namespace
 import yaml
-from typing import Optional, Union, Tuple, List, Dict, Callable
+from typing import Optional, Tuple, List, Dict
 
 import random
-from itertools import product
 import numpy as np
 from gsttransformer.misc import *
 import torch
@@ -22,7 +21,7 @@ from gsttransformer.data import GSTTCorpus, DataSetSplit
 from transformers import GPT2Tokenizer, GPT2Model
 from mellotron_api import load_tts
 
-from gsttransformer.model import GSTTransformer
+from gsttransformer.model import DGST
 # TODO add fine tuning script
 # TODO add LR plot
 # TODO add warm restart
@@ -49,7 +48,7 @@ model_configs: Dict = dict()
 gpt2: GPT2Model = None
 tokenizer: GPT2Tokenizer = None
 mellotron: Tuple = None
-gstt: GSTTransformer = None
+gstt: DGST = None
 # Data
 # Steps
 corpus_config_map: Dict[str, Dict] = dict()
@@ -185,7 +184,7 @@ def init_model():
     mellotron = load_tts(model_configs['tts'], device=torch.device('cpu')) if mellotron is None else mellotron
     logging.info("Mellotron instantiated")
     # Create GSTT instance
-    gstt = GSTTransformer(
+    gstt = DGST(
         gpt2.config,
         mellotron[0].gst.stl.attention.num_units,
         (mellotron[0].gst.stl.attention.num_heads, mellotron[0].gst.stl.embed.size(0))
@@ -322,7 +321,7 @@ def process_mini_batch(
     for s_idx, e_idx in idxs:
         with torch.autocast(device.type, enabled=mixed_precision):
             # Process current elements
-            outputs = gstt(input_embeds[s_idx:e_idx], attention_mask[s_idx:e_idx])
+            outputs = gstt(input_embeds[s_idx:e_idx])
             # Compute losses
             if gstt.training:
                 tmp_mse_loss = F.mse_loss(outputs['gst_embeds'], gst_embeddings[s_idx:e_idx])
