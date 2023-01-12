@@ -295,7 +295,7 @@ def set_env():
 
 
 def process_mini_batch(
-        split: str, input_embeds, attention_mask, gst_embeddings, gst_scores
+        split: str, input_embeds, gst_embeddings, gst_scores
 ):
     # Declare global variables
     # Compute helper params
@@ -311,7 +311,6 @@ def process_mini_batch(
 
     # Move tensors to devices
     input_embeds = input_embeds.to(device)
-    attention_mask = attention_mask.to(device)
     gst_embeddings = gst_embeddings.to(device)
     gst_scores = gst_scores.to(device)
 

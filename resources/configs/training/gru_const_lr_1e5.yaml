@@ -1,4 +1,4 @@
-experiment_series: GSTT
+experiment_series: DGST
 experiment_id: multi_config
 experiments_directory_path: ./experiments/
 
@@ -53,7 +53,7 @@ lm_small_resp:
   # Optimizer
   optimizer: &small_optimizer
     kwargs:
-      lr: &small_lr 5.e-5
+      lr: &small_lr 1.e-5
     n_epochs: 5
     max_gradient_norm: 1.0
   # LR scheduler
