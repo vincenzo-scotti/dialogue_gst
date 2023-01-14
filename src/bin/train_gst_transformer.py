@@ -295,7 +295,7 @@ def set_env():
 
 
 def process_mini_batch(
-        split: str, input_embeds, gst_embeddings, gst_scores
+        split: str, input_embeds, attention_mask, gst_embeddings, gst_scores
 ):
     # Declare global variables
     # Compute helper params
@@ -311,6 +311,7 @@ def process_mini_batch(
 
     # Move tensors to devices
     input_embeds = input_embeds.to(device)
+    attention_mask = attention_mask.to(device)
     gst_embeddings = gst_embeddings.to(device)
     gst_scores = gst_scores.to(device)
 
@@ -320,7 +321,7 @@ def process_mini_batch(
     for s_idx, e_idx in idxs:
         with torch.autocast(device.type, enabled=mixed_precision):
             # Process current elements
-            outputs = gstt(input_embeds[s_idx:e_idx])
+            outputs = gstt(input_embeds[s_idx:e_idx], attention_mask=attention_mask[s_idx:e_idx])
             # Compute losses
             if gstt.training:
                 tmp_mse_loss = F.mse_loss(outputs['gst_embeds'], gst_embeddings[s_idx:e_idx])
@@ -420,11 +421,11 @@ def process_evaluation(
     if best_validation_score is not None:
         if validation_loss['Loss'] <= best_validation_score:
             # Save GSTT state dictionary
-            torch.save(gstt.state_dict(), os.path.join(best_model_checkpoint_path, 'gstt.pt'))
+            torch.save(gstt.state_dict(), os.path.join(best_model_checkpoint_path, 'dgst.pt'))
             # Update best score
             best_validation_score = validation_loss['Loss']
             # Log update
-            logging.info("Validation objective improved, GSTT model checkpoint triggered")
+            logging.info("Validation objective improved, DGST model checkpoint triggered")
 
         return best_validation_score, validation_loss
     # Else do the final report
@@ -484,7 +485,7 @@ def fit_model():
                     # Run validation step
                     evaluation_step()
             # Save end of epoch checkpoint
-            torch.save(gstt.state_dict(), os.path.join(model_checkpoint_path, 'gstt.pt'))
+            torch.save(gstt.state_dict(), os.path.join(model_checkpoint_path, 'dgst.pt'))
             # Log end of epoch
             logging.info(f"Epoch {epoch + 1}/{n_epochs} finished")
 
@@ -496,7 +497,7 @@ def fit_model():
         logging.info(f"Validation started")
         # Set gpt2 in evaluation mode
         gstt.eval()
-        logging.info("GSTT model set in evaluation mode")
+        logging.info("DGST model set in evaluation mode")
         # Do validation step
         best_validation_score, validation_loss = process_evaluation(
             'validation',
@@ -507,7 +508,7 @@ def fit_model():
         logging.info(f"Validation completed - Loss {validation_loss['Loss']:.4f}")
         # Set GSTT back in training mode
         gstt.train()
-        logging.info("GSTT model set in training mode")
+        logging.info("DGST model set in training mode")
 
     # Train and validation process
     # Get current date and time
@@ -523,9 +524,9 @@ def fit_model():
     # Log end of specific training step
     logging.info(f"Training finished - (ID {config_id})")
     # Restore best validation gpt2 weights
-    gstt.load_state_dict(torch.load(os.path.join(best_model_checkpoint_path, 'gstt.pt')))
+    gstt.load_state_dict(torch.load(os.path.join(best_model_checkpoint_path, 'dgst.pt')))
     gstt.to(device)
-    logging.info("Best validation GSTT weights restored")
+    logging.info("Best validation DGST weights restored")
     # Close training
     # Get current date and time
     end_time: datetime = datetime.now()
@@ -544,7 +545,7 @@ def evaluate_model():
     logging.info(f"Evaluation started - Current date and time {start_time} - (ID {config_id})")
     # Set gpt2 in evaluation mode
     gstt.eval()
-    logging.info(f"GSTT model set in evaluation mode")
+    logging.info(f"DGST model set in evaluation mode")
     # Log start on validation set
     logging.info(f"Validation set evaluation started")
     # Compute summary report on validation set

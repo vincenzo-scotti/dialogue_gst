@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 from transformers.models.gpt2 import GPT2Config
@@ -22,16 +23,27 @@ class DGST(nn.Module):
         self.ln_f = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_epsilon)
         # Heads
         self.gst_embeds_head = nn.Linear(
-            config.hidden_size, self.gst_embeds_size
+            config.hidden_size, self.gst_embeds_size, bias=False
         ) if self.gst_embeds_size is not None else None
         self.gst_scores_head = nn.Linear(
-            config.hidden_size, self.gst_scores_shape[0] * self.gst_scores_shape[1]
+            config.hidden_size, self.gst_scores_shape[0] * self.gst_scores_shape[1], bias=False
         ) if self.gst_scores_shape is not None else None
 
-    def forward(self, input_embeds, use_cache: Optional[bool] = False, **kwargs):
+    def forward(
+            self,
+            input_embeds,
+            attention_mask: Optional[torch.tensor] = None,
+            use_cache: Optional[bool] = False,
+            **kwargs
+    ):
         # Get hidden vectors
         hidden_outputs, last_hidden_state = self.h(input_embeds)
-        hidden_states = last_hidden_state.squeeze(0)
+        if attention_mask is not None:
+            hidden_states = hidden_outputs[
+                torch.arange(hidden_outputs.size(1)), torch.argmax(hidden_outputs.cumsum(dim=1), dim=1)
+            ]
+        else:
+            hidden_states = last_hidden_state.squeeze(0)
         # Apply last normalisation
         hidden_states = self.ln_f(hidden_states)
 

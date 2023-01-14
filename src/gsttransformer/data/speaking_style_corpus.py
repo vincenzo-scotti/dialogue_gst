@@ -37,7 +37,7 @@ class GSTTCorpus(Dataset):
             cache_dir_path: str,
             encoding_mode: str,
             *args,
-            corpus_prefix: str = 'gstt_corpus',
+            corpus_prefix: str = 'dgst_corpus',
             corpus_list: Optional[List[str]] = None,
             reload_cache: bool = False,
             max_context_length: Optional[int] = None,
@@ -232,16 +232,21 @@ class GSTTCorpus(Dataset):
             for batch_idx, data_idx in enumerate(range(s_idx, e_idx)):
                 self.data[data_idx]['embeddings'] = hidden[batch_idx, valid_mask[batch_idx]].unsqueeze(0).cpu()
 
-    def collate(self, mini_batch) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:
+    def collate(self, mini_batch) -> Tuple[torch.tensor, torch.tensor, torch.tensor, torch.tensor]:
         # Get max length for padding
         max_len = max(sample['embeddings'].size(1) for sample in mini_batch)
         # Create batch with current embeddings
         input_embeds = torch.vstack([
             F.pad(sample['embeddings'], (0, 0, 0, max_len - sample['embeddings'].size(1))) for sample in mini_batch
         ])
+        # Get attention mask
+        attention_mask = torch.vstack([F.pad(
+            torch.ones((len(mini_batch), sample['embeddings'].size(1)), dtype=torch.long),
+            (0, max_len - sample['embeddings'].size(1))
+        ) for sample in mini_batch])
         # GST embeddings
         gst_embeddings = torch.tensor([sample['gst_embeddings'] for sample in mini_batch]) if self.gst_embeds else None
         # GST scores
         gst_scores = torch.tensor([sample['gst_scores'] for sample in mini_batch]) if self.gst_scores else None
 
-        return input_embeds, gst_embeddings, gst_scores
+        return input_embeds, attention_mask, gst_embeddings, gst_scores

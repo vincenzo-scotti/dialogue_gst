@@ -1,5 +1,5 @@
 experiment_series: DGST
-experiment_id: multi_config_final
+experiment_id: multi_config
 experiments_directory_path: ./experiments/
 
 random_seed: &random_seed 2307
@@ -18,9 +18,6 @@ training_configs:
   - lm_large_resp
   - lm_large_resp_from_ctx
   - lm_large_ctx_resp
-  - therapy_lm_large_resp
-  - therapy_lm_large_resp_from_ctx
-  - therapy_lm_large_ctx_resp
 
 lm_small_resp:
   # Models
@@ -56,7 +53,7 @@ lm_small_resp:
   # Optimizer
   optimizer: &small_optimizer
     kwargs:
-      lr: &small_lr 5.e-4
+      lr: &small_lr 1.e-3
     n_epochs: 5
     max_gradient_norm: 1.0
   # LR scheduler
@@ -146,7 +143,7 @@ lm_medium_resp:
   # Optimizer
   optimizer: &medium_optimizer
     kwargs:
-      lr: &medium_lr 5.e-4
+      lr: &medium_lr 1.e-3
     n_epochs: 5
     max_gradient_norm: 1.0
   # LR scheduler
@@ -236,7 +233,7 @@ lm_large_resp:
   # Optimizer
   optimizer: &large_optimizer
     kwargs:
-      lr: &large_lr 5.e-4
+      lr: &large_lr 1.e-3
     n_epochs: 5
     max_gradient_norm: 1.0
   # LR scheduler
@@ -292,78 +289,4 @@ lm_large_ctx_resp:
   # Evaluation
   # evaluation: *large_evaluation
 
-therapy_lm_large_resp:
-  # Models
-  model: &therapy_large_model
-    lm:
-      gpt2: ../dldlm/resources/models/ therapy_dldlm
-      tokenizer: ../dldlm/resources/models/ therapy_dldlm
-    tts: *tts
-  # Data
-  data:
-    corpora_dir_path: *corpus_dir
-    cache_dir_path: *cache_dir
-    encoding_mode: *resp
-    kwargs: &therapy_large_data_kwargs
-      corpus_list:
-        - IEMOCAP_full_release
-      response_prefix_token: <|prior|>
-      response_suffix_token: <|posterior|>
-      max_context_length: 256
-      max_response_length: 128
-      in_mem: 16
-    splits: *large_loader_configs
-  # Optimizer
-  optimizer: *large_optimizer
-  # LR scheduler
-  # lr_scheduler: &large_scheduler
-  #   lr: *large_lr
-  #   lr_start: 0.0
-  #   lr_stop: 0.0
-  #   warmup: 0.05
-  # Loss
-  # loss: &large_loss_weights {}
-    # mse_weight: 1.0
-    # kl_weight: 1.0
-  # Evaluation
-  # evaluation: &large_evaluation {}
-    # validation_period: 100
-    # logging_period: 10
 
-therapy_lm_large_resp_from_ctx:
-  # Models
-  model: *therapy_large_model
-  # Data
-  data:
-    corpora_dir_path: *corpus_dir
-    cache_dir_path: *cache_dir
-    encoding_mode: *resp_from_ctx
-    kwargs: *therapy_large_data_kwargs
-    splits: *large_loader_configs
-  # Optimizer
-  optimizer: *large_optimizer
-  # LR scheduler
-  # lr_scheduler: *large_scheduler
-  # Loss
-  # loss: *loss_weights
-  # Evaluation
-  # evaluation: *large_evaluation
-
-therapy_lm_large_ctx_resp:
-  # Models
-  model: *therapy_large_model
-  # Data
-  data:
-    corpora_dir_path: *corpus_dir
-    cache_dir_path: *cache_dir
-    encoding_mode: *ctx_resp
-    kwargs: *therapy_large_data_kwargs
-    splits: *large_loader_configs
-  # Optimizer
-  optimizer: *large_optimizer
-  # LR scheduler
-  # lr_scheduler: *large_scheduler
-  # Loss
-  # loss: *loss_weights
-  # Evaluation
-  # evaluation: *large_evaluation

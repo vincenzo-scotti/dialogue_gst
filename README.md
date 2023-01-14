@@ -1,4 +1,4 @@
-# GST-Transformer
+# Dialogue GST
 
 Codebase for the paper "[On the Role of Dialogue Context in Predicting Speaking Style](https://www.overleaf.com/read/cjqcjkkxntkp)". 
 This repository contains the implementation of the GST-Transformer described in the paper.

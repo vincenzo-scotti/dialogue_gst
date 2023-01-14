@@ -1,3 +1,5 @@
+import numpy as np
+
 import torch
 from transformers import GPT2Tokenizer, GPT2Model
 from mellotron_api import load_tts, load_vocoder, load_arpabet_dict, synthesise_speech
@@ -88,14 +90,14 @@ class ChatSpeechGenerator:
     def __call__(self, *args, **kwargs):
         return self.generate_speech_response(*args, **kwargs)
 
-    def _get_input_hidden_states(self, response: str, dialogue: Optional[List[str]] = None) -> torch.tensor:
+    def _get_input_hidden_states(self, response: str, dialogue: Optional[Union[str, List[str]]] = None) -> torch.tensor:
         # Input validation
         assert self.gpt2 is not None and self.tokenizer is not None
         # Prepare context (if needed)
         if self.encoding_mode == 'resp_from_ctx' or self.encoding_mode == 'ctx_resp':
-            context = self.tokenizer.bos_token + (
+            context = dialogue if isinstance(dialogue, str) else (self.tokenizer.bos_token + (
                 ''.join(utterance + self.tokenizer.eos_token for utterance in dialogue) if dialogue is not None else ''
-            )
+            ))
         else:
             context = ''
         # Encode the input
@@ -106,24 +108,25 @@ class ChatSpeechGenerator:
         # Prepare valid mask to retrieve the desired embeddings
         valid_mask = input_encodings.attention_mask.bool().squeeze()
         if self.encoding_mode == 'resp_from_ctx':
-            valid_mask[:len(self.tokenizer(context).input_ids)] = False
+            valid_mask[:, :len(self.tokenizer(context).input_ids)] = False
         # Compute transformer last hidden states
         last_hidden_states = self.gpt2(**input_encodings).last_hidden_state[:, valid_mask]
 
         return last_hidden_states
 
     def _predict_gst(
-            self, response: str, gst_prediction: Literal['embed', 'score'], dialogue: Optional[List[str]] = None
+            self, response: str, gst_prediction: Literal['embed', 'score', 'all'] = 'all', dialogue: Optional[Union[str, List[str]]] = None
     ) -> Tuple[Optional[List[float]], Optional[List[List[float]]]]:
         # Input validation
         assert self.gstt is not None
-        # Prepare input hidden states
-        hidden_states = self._get_input_hidden_states(response, dialogue=dialogue)
-        # Compute GST
-        outputs = self.gstt(hidden_states)
-        # Extract computed GST
-        gst_embeddings = outputs['gst_embeds'].squeeze().cpu().tolist() if gst_prediction == 'embed' else None
-        gst_scores = torch.softmax(outputs['gst_scores'], dim=-1).squeeze().cpu().tolist() if gst_prediction == 'score' else None
+        with torch.no_grad(), torch.autocast(self.device.type, enabled=self.mixed_precision):
+            # Prepare input hidden states
+            hidden_states = self._get_input_hidden_states(response, dialogue=dialogue)
+            # Compute GST
+            outputs = self.gstt(hidden_states)
+            # Extract computed GST
+            gst_embeddings = outputs['gst_embeds'].squeeze().cpu().tolist() if gst_prediction in ('embed', 'all') else None
+            gst_scores = torch.softmax(outputs['gst_scores'], dim=-1).squeeze().cpu().tolist() if gst_prediction in ('score', 'all') else None
 
         return gst_embeddings, gst_scores
 
@@ -134,13 +137,13 @@ class ChatSpeechGenerator:
             gst_embeddings: Optional[List[float]],
             gst_scores: Optional[List[List[float]]],
             output_file_path: str
-    ):
+    ) -> np.ndarray:
         # Input validation
         assert not (gst_embeddings is not None or gst_scores is not None or speaker_id is not None) or self.mellotron is not None
         # Generate audio
         if gst_embeddings is not None or gst_scores is not None or speaker_id is not None:
             # If conditioning is required use Mellotron to synthesise
-            synthesise_speech(
+            return synthesise_speech(
                 text,
                 self.mellotron,
                 self.mellotron_hparams,
@@ -158,7 +161,7 @@ class ChatSpeechGenerator:
             )
         else:
             # Else use directly Tacotron 2
-            synthesise_speech(
+            return synthesise_speech(
                 text,
                 self.tacotron2,
                 self.tacotron2_hparams,
@@ -174,10 +177,10 @@ class ChatSpeechGenerator:
             self,
             response: str,
             output_file_path: str,
-            dialogue: Optional[List[str]] = None,
+            dialogue: Optional[Union[str, List[str]]] = None,
             gst_prediction: Optional[Literal['embed', 'score']] = None,
             speaker_id: Optional[int] = None,
-    ) -> str:
+    ) -> np.ndarray:
         # Predict GST embedding or scores from text (if required)
         if gst_prediction is not None:
             with torch.no_grad(), torch.autocast(self.device.type, enabled=self.mixed_precision):
@@ -185,7 +188,5 @@ class ChatSpeechGenerator:
         else:
             gst_embeddings = gst_scores = None
         # Finally generate the audio clip
-        self._synthesise_audio(response, speaker_id, gst_embeddings, gst_scores, output_file_path)
-        # Return path of the synthesised audio clip
-        return output_file_path
+        return self._synthesise_audio(response, speaker_id, gst_embeddings, gst_scores, output_file_path)
 
