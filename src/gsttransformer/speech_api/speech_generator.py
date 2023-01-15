@@ -108,7 +108,7 @@ class ChatSpeechGenerator:
         # Prepare valid mask to retrieve the desired embeddings
         valid_mask = input_encodings.attention_mask.bool().squeeze()
         if self.encoding_mode == 'resp_from_ctx':
-            valid_mask[:, :len(self.tokenizer(context).input_ids)] = False
+            valid_mask[:len(self.tokenizer(context).input_ids)] = False
         # Compute transformer last hidden states
         last_hidden_states = self.gpt2(**input_encodings).last_hidden_state[:, valid_mask]
 
