@@ -296,8 +296,8 @@ therapy_lm_large_resp:
   # Models
   model: &therapy_large_model
     lm:
-      gpt2: ../dldlm/resources/models/ therapy_dldlm
-      tokenizer: ../dldlm/resources/models/ therapy_dldlm
+      gpt2: ../dldlm/resources/models/therapy_dldlm
+      tokenizer: ../dldlm/resources/models/therapy_dldlm
     tts: *tts
   # Data
   data:

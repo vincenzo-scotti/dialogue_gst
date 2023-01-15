@@ -40,7 +40,7 @@ class DGST(nn.Module):
         hidden_outputs, last_hidden_state = self.h(input_embeds)
         if attention_mask is not None:
             hidden_states = hidden_outputs[
-                torch.arange(hidden_outputs.size(1)), torch.argmax(hidden_outputs.cumsum(dim=1), dim=1)
+                torch.arange(hidden_outputs.size(0)), torch.argmax(attention_mask.cumsum(dim=1), dim=1)
             ]
         else:
             hidden_states = last_hidden_state.squeeze(0)
