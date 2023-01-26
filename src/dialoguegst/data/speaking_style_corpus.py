@@ -26,7 +26,7 @@ CORPORA: Dict = {
 
 # TODO move here context cutting, it shouldn't be part of the corpora loaders
 # TODO add class for fine tuning
-class GSTTCorpus(Dataset):
+class DGSTCorpus(Dataset):
     def __init__(
             self,
             corpora_dir_path: str,
@@ -54,7 +54,7 @@ class GSTTCorpus(Dataset):
             verbosity_level: int = 2,
             **kwargs
     ):
-        super(GSTTCorpus, self).__init__()
+        super(DGSTCorpus, self).__init__()
         #
         self.in_mem: int = in_mem
         self.device: torch.device = device if device is not None else torch.device(

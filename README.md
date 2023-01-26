@@ -1,7 +1,7 @@
 # Dialogue GST
 
-Codebase for the paper "[On the Role of Dialogue Context in Predicting Speaking Style](https://www.overleaf.com/read/cjqcjkkxntkp)". 
-This repository contains the implementation of the GST-Transformer described in the paper.
+Codebase for the extended summary "[On the Role of Dialogue Context in Predicting Speaking Style](https://www.overleaf.com/read/cjqcjkkxntkp)". 
+This repository contains the implementation of the DialogueGST described in the paper.
 
 ## Repository structure
 
@@ -30,9 +30,9 @@ To install all the required packages within an anaconda environment, run the fol
 
 ```bash
 # Create anaconda environment (skip cudatoolkit option if you don't want to use the GPU)
-conda create -n gstt python=3.10 cudatoolkit=11.3
+conda create -n dgst python=3.10 cudatoolkit=11.3
 # Activate anaconda environment
-conda activate gstt
+conda activate dgst
 # Install packages
 conda install pytorch=1.11.0 -c pytorch
 conda install -c conda-forge numpy=1.21 transformers tensorboard pandas scikit-learn librosa matplotlib seaborn jupyterlab
@@ -48,11 +48,11 @@ git submodule init; git submodule update
 To add the directories to the Python path, you can add these lines to the file `~/.bashrc`
 
 ```bash
-export PYTHONPATH=$PYTHONPATH:/path/to/gsttransformer/src
-export PYTHONPATH=$PYTHONPATH:/path/to/gsttransformer/tts_mellotron_api/src
-export PYTHONPATH=$PYTHONPATH:/path/to/gsttransformer/tts_mellotron_api/mellotron
-export PYTHONPATH=$PYTHONPATH:/path/to/gsttransformer/tts_mellotron_api/mellotron/waveglow
-export PYTHONPATH=$PYTHONPATH:/path/to/gsttransformer/tts_mellotron_api/tacotron2
+export PYTHONPATH=$PYTHONPATH:/path/to/dialoguegst/src
+export PYTHONPATH=$PYTHONPATH:/path/to/dialoguegst/tts_mellotron_api/src
+export PYTHONPATH=$PYTHONPATH:/path/to/dialoguegst/tts_mellotron_api/mellotron
+export PYTHONPATH=$PYTHONPATH:/path/to/dialoguegst/tts_mellotron_api/mellotron/waveglow
+export PYTHONPATH=$PYTHONPATH:/path/to/dialoguegst/tts_mellotron_api/tacotron2
 ```
 
 ## Training
@@ -63,13 +63,13 @@ There is a script to train or fine-tune the model, it expects to have `./src` in
 
 To train the model run:
 ```bash
-python ./src/bin/train_gst_transformer.py --config_file_path ./resources/configs/path/to/config.yaml
+python ./src/bin/train_dialogue_gst.py --config_file_path ./resources/configs/path/to/config.yaml
 ```
 
 To train the model in background run:
 
 ```bash
-nohup python ./src/bin/train_gst_transformer.py --config_file_path ./resources/configs/path/to/config.yaml > experiment_"$(date '+%Y_%m_%d_%H_%M_%S')".out &
+nohup python ./src/bin/train_dialogue_gst.py --config_file_path ./resources/configs/path/to/config.yaml > experiment_"$(date '+%Y_%m_%d_%H_%M_%S')".out &
 ```
 
 ### Monitor
@@ -87,10 +87,6 @@ tensorboard --logdir ./expertiments/path/to/tensorboard/
 ```
 
 Finally, connect to http://127.0.0.1:16006 on your local machine
-
-## Evaluation
-
-TBD
 
 ## References
 

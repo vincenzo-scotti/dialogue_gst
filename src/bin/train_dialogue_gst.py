@@ -9,7 +9,7 @@ from typing import Optional, Tuple, List, Dict
 
 import random
 import numpy as np
-from gsttransformer.misc import *
+from dialoguegst.misc import *
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -17,11 +17,11 @@ from torch.optim import Optimizer
 from torch.cuda.amp import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 
-from gsttransformer.data import GSTTCorpus, DataSetSplit
+from dialoguegst.data import DGSTCorpus, DataSetSplit
 from transformers import GPT2Tokenizer, GPT2Model
 from mellotron_api import load_tts
 
-from gsttransformer.model import DGST
+from dialoguegst.model import DGST
 # TODO add fine tuning script
 # TODO add LR plot
 # TODO add warm restart
@@ -48,13 +48,13 @@ model_configs: Dict = dict()
 gpt2: GPT2Model = None
 tokenizer: GPT2Tokenizer = None
 mellotron: Tuple = None
-gstt: DGST = None
+dgst: DGST = None
 # Data
 # Steps
 corpus_config_map: Dict[str, Dict] = dict()
 # Current
 corpus_configs: Dict = dict()
-corpora: Dict[DataSetSplit, GSTTCorpus] = dict()
+corpora: Dict[DataSetSplit, DGSTCorpus] = dict()
 corpus_loaders: Dict[DataSetSplit, DataLoader] = dict()
 # Optimisation
 # Steps
@@ -175,7 +175,7 @@ def clean_environment():
 
 def init_model():
     # Declare global variables
-    global gpt2, tokenizer, mellotron, gstt
+    global gpt2, tokenizer, mellotron, dgst
     # Create GPT2 and Tokenizer instance
     gpt2 = GPT2Model.from_pretrained(model_configs['lm']['gpt2']).eval().to(device)
     tokenizer = GPT2Tokenizer.from_pretrained(model_configs['lm']['tokenizer'], pad_token='<|endoftext|>')
@@ -184,7 +184,7 @@ def init_model():
     mellotron = load_tts(model_configs['tts'], device=torch.device('cpu')) if mellotron is None else mellotron
     logging.info("Mellotron instantiated")
     # Create GSTT instance
-    gstt = DGST(
+    dgst = DGST(
         gpt2.config,
         mellotron[0].gst.stl.attention.num_units,
         (mellotron[0].gst.stl.attention.num_heads, mellotron[0].gst.stl.embed.size(0))
@@ -201,7 +201,7 @@ def init_data_loaders():
     # Iterate over splits
     for split in corpus_configs['splits']:
         # Create data set instance
-        data_set: GSTTCorpus = GSTTCorpus(
+        data_set: DGSTCorpus = DGSTCorpus(
             corpus_configs['corpora_dir_path'],
             gpt2,
             tokenizer,
@@ -242,7 +242,7 @@ def init_optimisation_tools():
     global lr_scheduler_configs, optimizer, lr_scheduler, scaler
     # Create optimiser instance
     optimizer = torch.optim.AdamW(
-        params=gstt.parameters(), **optimizer_configs['kwargs']
+        params=dgst.parameters(), **optimizer_configs['kwargs']
     )
     logging.info(f"Optimiser instantiated (ID: {config_id})")
     # Create learning rate scheduler instance if required
@@ -301,8 +301,8 @@ def process_mini_batch(
     # Compute helper params
     in_mem: int = corpus_configs['splits'][split]['in_mem']
     # Loss accumulators
-    mse_loss = torch.tensor(0., device=device) if gstt.training else torch.empty(0, device=device)
-    kl_div_loss = torch.tensor(0., device=device) if gstt.training else torch.empty(0, device=device)
+    mse_loss = torch.tensor(0., device=device) if dgst.training else torch.empty(0, device=device)
+    kl_div_loss = torch.tensor(0., device=device) if dgst.training else torch.empty(0, device=device)
     # Number elements in batch
     n_samples = input_embeds.size(0)
     # Losses weights
@@ -321,9 +321,9 @@ def process_mini_batch(
     for s_idx, e_idx in idxs:
         with torch.autocast(device.type, enabled=mixed_precision):
             # Process current elements
-            outputs = gstt(input_embeds[s_idx:e_idx], attention_mask=attention_mask[s_idx:e_idx])
+            outputs = dgst(input_embeds[s_idx:e_idx], attention_mask=attention_mask[s_idx:e_idx])
             # Compute losses
-            if gstt.training:
+            if dgst.training:
                 tmp_mse_loss = F.mse_loss(outputs['gst_embeds'], gst_embeddings[s_idx:e_idx])
                 tmp_kl_div_loss = F.kl_div(
                     F.log_softmax(outputs['gst_scores'], -1).view(-1, gst_scores.size(-1)),
@@ -340,20 +340,20 @@ def process_mini_batch(
                     log_target=True
                 ).sum(-1).mean(1)
             # Scale loss if using gradient accumulation (only in training)
-            if gstt.training:
+            if dgst.training:
                 tmp_mse_loss = tmp_mse_loss * (e_idx - s_idx) / n_samples
                 tmp_kl_div_loss = tmp_kl_div_loss * (e_idx - s_idx) / n_samples
 
                 tmp_loss = w_mse * tmp_mse_loss + w_kl * tmp_kl_div_loss
         # Compute gradients if gpt2 is training
-        if gstt.training:
+        if dgst.training:
             # Compute gradients
             if scaler is not None:
                 scaler.scale(tmp_loss).backward()
             else:
                 tmp_loss.backward()
         # Accumulate losses
-        if gstt.training:
+        if dgst.training:
             mse_loss += tmp_mse_loss.detach()
             kl_div_loss += tmp_kl_div_loss.detach()
         else:
@@ -363,13 +363,13 @@ def process_mini_batch(
     loss = (w_mse * mse_loss) + (w_kl * kl_div_loss)
     logging.debug('Processing complete')
 
-    if gstt.training:
+    if dgst.training:
         # Clip gradient norm
         if optimizer_configs['max_gradient_norm'] > 0.0:
             if scaler is not None:
                 scaler.unscale_(optimizer)
             # Clip gradient norm
-            torch.nn.utils.clip_grad_norm_(gstt.parameters(), max_norm=optimizer_configs['max_gradient_norm'])
+            torch.nn.utils.clip_grad_norm_(dgst.parameters(), max_norm=optimizer_configs['max_gradient_norm'])
         # Update weights
         if scaler is not None:
             scaler.step(optimizer)
@@ -380,7 +380,7 @@ def process_mini_batch(
         if lr_scheduler is not None:
             lr_scheduler.step()
         # Reset optimiser and gpt2 gradients
-        for param in gstt.parameters():
+        for param in dgst.parameters():
             param.grad = None
 
     # Generate losses dict
@@ -421,7 +421,7 @@ def process_evaluation(
     if best_validation_score is not None:
         if validation_loss['Loss'] <= best_validation_score:
             # Save GSTT state dictionary
-            torch.save(gstt.state_dict(), os.path.join(best_model_checkpoint_path, 'dgst.pt'))
+            torch.save(dgst.state_dict(), os.path.join(best_model_checkpoint_path, 'dgst.pt'))
             # Update best score
             best_validation_score = validation_loss['Loss']
             # Log update
@@ -485,7 +485,7 @@ def fit_model():
                     # Run validation step
                     evaluation_step()
             # Save end of epoch checkpoint
-            torch.save(gstt.state_dict(), os.path.join(model_checkpoint_path, 'dgst.pt'))
+            torch.save(dgst.state_dict(), os.path.join(model_checkpoint_path, 'dgst.pt'))
             # Log end of epoch
             logging.info(f"Epoch {epoch + 1}/{n_epochs} finished")
 
@@ -496,7 +496,7 @@ def fit_model():
         # Log start of validation
         logging.info(f"Validation started")
         # Set gpt2 in evaluation mode
-        gstt.eval()
+        dgst.eval()
         logging.info("DGST model set in evaluation mode")
         # Do validation step
         best_validation_score, validation_loss = process_evaluation(
@@ -507,7 +507,7 @@ def fit_model():
         # Log end of validation
         logging.info(f"Validation completed - Loss {validation_loss['Loss']:.4f}")
         # Set GSTT back in training mode
-        gstt.train()
+        dgst.train()
         logging.info("DGST model set in training mode")
 
     # Train and validation process
@@ -516,7 +516,7 @@ def fit_model():
     # Log start of misc
     logging.info(f"Training started - Current date and time {start_time} - (ID {config_id})")
     # Set GSTT in training mode
-    gstt.train()
+    dgst.train()
     # Log start of specific training step
     logging.info(f"Training started")
     # Run training step  #NOTE unused training steps will be simply skipped
@@ -524,8 +524,8 @@ def fit_model():
     # Log end of specific training step
     logging.info(f"Training finished - (ID {config_id})")
     # Restore best validation gpt2 weights
-    gstt.load_state_dict(torch.load(os.path.join(best_model_checkpoint_path, 'dgst.pt')))
-    gstt.to(device)
+    dgst.load_state_dict(torch.load(os.path.join(best_model_checkpoint_path, 'dgst.pt')))
+    dgst.to(device)
     logging.info("Best validation DGST weights restored")
     # Close training
     # Get current date and time
@@ -537,14 +537,14 @@ def fit_model():
 
 def evaluate_model():
     # Declare global variables
-    global writer, gstt
+    global writer, dgst
     # Start evaluation
     # Get current date and time
     start_time: datetime = datetime.now()
     # Log start of evaluation
     logging.info(f"Evaluation started - Current date and time {start_time} - (ID {config_id})")
     # Set gpt2 in evaluation mode
-    gstt.eval()
+    dgst.eval()
     logging.info(f"DGST model set in evaluation mode")
     # Log start on validation set
     logging.info(f"Validation set evaluation started")
@@ -575,7 +575,7 @@ def evaluate_model():
     logging.info(f"Evaluation finished - Current date and time {end_time} - (ID {config_id})")
     logging.info(f"Elapsed time {end_time - start_time}")
     # Remove trained model
-    del gstt
+    del dgst
 
 
 def main(args: Namespace):

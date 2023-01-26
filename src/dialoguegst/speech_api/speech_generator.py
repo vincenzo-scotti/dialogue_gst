@@ -4,7 +4,7 @@ import torch
 from transformers import GPT2Tokenizer, GPT2Model
 from mellotron_api import load_tts, load_vocoder, load_arpabet_dict, synthesise_speech
 
-from gsttransformer.model import DGST
+from dialoguegst.model import DGST
 
 from typing import Tuple, List, Union, Literal, Optional
 
