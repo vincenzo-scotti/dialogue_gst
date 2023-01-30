@@ -4,13 +4,20 @@ This directory is used to host the pre-trained model directories.
 These directories contain both models and tokenisers trained during the experiments.
 It is possible to download a zip archive with all the trained models at [this link]().
 
+GST prediction:
+- [DGST]()
+  - Using Therapy-DLDLM response embedding computed from context ([link](https://polimi365-my.sharepoint.com/:u:/g/personal/10451445_polimi_it/EYvTr-aD0glErLSBhKf1J18BgetFIAhC_MO1iugkFHwrhg?e=2ReQdb)).
+
+For the checkpoints of the DGST models, refer to `./experiments/README.md`.
+
 Response generation:
 - [DialoGPT](https://aclanthology.org/2020.acl-demos.30/):
   - Small ([link](https://huggingface.co/microsoft/DialoGPT-small));
   - Medium ([link](https://huggingface.co/microsoft/DialoGPT-medium));
-  - Large ([link](https://huggingface.co/microsoft/DialoGPT-large)).
+  - Large ([link](https://huggingface.co/microsoft/DialoGPT-large));
+  - Therapy-DLDLM ([link](https://polimi365-my.sharepoint.com/:u:/g/personal/10451445_polimi_it/EQ7PspwlveNPnXsB4Bl7T2wBxpa6SGVS3hTaBAEvFatTWA?e=qC8CxS)).
   
-Please refer to the [Transformers](https://huggingface.co/docs/transformers/index) library by [HuggingFace](https://huggingface.co) for further details on the dialogue language model.
+Please refer to the [Transformers](https://huggingface.co/docs/transformers/index) library by [HuggingFace](https://huggingface.co) for further details on the DialoGPT language models.
 
 Voice synthesis:
 - Spectrogram generation:
@@ -27,8 +34,8 @@ For simplicity we provide a separate zip file with all the model checkpoints nec
 Directory structure:
 ```
  |- models/
-    |- gstt/
-      |- ...
+    |- dgst/
+      |- dgst.pt
     |- tts/
       |- mellotron/
         |- mellotron_ljs.pt
