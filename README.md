@@ -49,10 +49,10 @@ To add the directories to the Python path, you can add these lines to the file `
 
 ```bash
 export PYTHONPATH=$PYTHONPATH:/path/to/dialoguegst/src
-export PYTHONPATH=$PYTHONPATH:/path/to/dialoguegst/tts_mellotron_api/src
-export PYTHONPATH=$PYTHONPATH:/path/to/dialoguegst/tts_mellotron_api/mellotron
-export PYTHONPATH=$PYTHONPATH:/path/to/dialoguegst/tts_mellotron_api/mellotron/waveglow
-export PYTHONPATH=$PYTHONPATH:/path/to/dialoguegst/tts_mellotron_api/tacotron2
+export PYTHONPATH=$PYTHONPATH:/path/to/dialoguegst/submodules/tts_mellotron_api/src
+export PYTHONPATH=$PYTHONPATH:/path/to/dialoguegst/submodules/tts_mellotron_api/submodules/mellotron
+export PYTHONPATH=$PYTHONPATH:/path/to/dialoguegst/submodules/tts_mellotron_api/submodules/mellotron/waveglow
+export PYTHONPATH=$PYTHONPATH:/path/to/dialoguegst/submodules/tts_mellotron_api/submodules/tacotron2
 ```
 
 ## Training
