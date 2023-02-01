@@ -12,7 +12,7 @@ from typing import Tuple, List, Union, Literal, Optional
 class ChatSpeechGenerator:
     def __init__(
             self,
-            gstt: Union[str, DGST],
+            dgst: Union[str, DGST],
             tokenizer: Union[str, GPT2Tokenizer],
             gpt2: Union[str, GPT2Model],
             mellotron: Optional[Union[str, Tuple]] = None,
@@ -60,19 +60,19 @@ class ChatSpeechGenerator:
             self.arpabet_dict = None
 
         # GST predictor
-        if gstt is not None and mellotron is not None:  # NOTE no point in having predictor if there is no conditioned TTS
-            if isinstance(gstt, str):
-                self.gstt = DGST(
+        if dgst is not None and mellotron is not None:  # NOTE no point in having predictor if there is no conditioned TTS
+            if isinstance(dgst, str):
+                self.dgst = DGST(
                     self.gpt2.config,
                     self.mellotron.gst.stl.attention.num_units,
                     (self.mellotron.gst.stl.attention.num_heads, self.mellotron.gst.stl.embed.size(0))
                 )
-                self.gstt.load_state_dict(torch.load(gstt))
-                self.gstt.eval().to(device)
+                self.dgst.load_state_dict(torch.load(dgst))
             else:
-                self.gstt = gstt
+                self.dgst = dgst
+            self.dgst.eval().to(device)
         else:
-            self.gstt = None
+            self.dgst = None
 
         # Special tokens
         self.prefix_token = prefix_token
@@ -118,12 +118,12 @@ class ChatSpeechGenerator:
             self, response: str, gst_prediction: Literal['embed', 'score', 'all'] = 'all', dialogue: Optional[Union[str, List[str]]] = None
     ) -> Tuple[Optional[List[float]], Optional[List[List[float]]]]:
         # Input validation
-        assert self.gstt is not None
+        assert self.dgst is not None
         with torch.no_grad(), torch.autocast(self.device.type, enabled=self.mixed_precision):
             # Prepare input hidden states
             hidden_states = self._get_input_hidden_states(response, dialogue=dialogue)
             # Compute GST
-            outputs = self.gstt(hidden_states)
+            outputs = self.dgst(hidden_states)
             # Extract computed GST
             gst_embeddings = outputs['gst_embeds'].squeeze().cpu().tolist() if gst_prediction in ('embed', 'all') else None
             gst_scores = torch.softmax(outputs['gst_scores'], dim=-1).squeeze().cpu().tolist() if gst_prediction in ('score', 'all') else None
@@ -172,7 +172,7 @@ class ChatSpeechGenerator:
                 out_path=output_file_path
             )
 
-    # NOTE it is suggested to wrap the call il a temporary file context manager
+    # NOTE it is suggested to wrap the call in a temporary file context manager
     def generate_speech_response(
             self,
             response: str,
