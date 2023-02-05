@@ -13,8 +13,8 @@ class ChatSpeechGenerator:
     def __init__(
             self,
             dgst: Union[str, DGST],
-            tokenizer: Union[str, GPT2Tokenizer],
-            gpt2: Union[str, GPT2Model],
+            tokenizer: Optional[Union[str, GPT2Tokenizer]],
+            gpt2: Optional[Union[str, GPT2Model]],
             mellotron: Optional[Union[str, Tuple]] = None,
             tacotron2: Optional[Union[str, Tuple]] = None,
             vocoder: Optional[Union[str, Tuple]] = None,
@@ -28,10 +28,11 @@ class ChatSpeechGenerator:
     ):
         super(ChatSpeechGenerator, self).__init__()
         # Dialogue Language Model
-        self.gpt2: GPT2Model = GPT2Model.from_pretrained(gpt2).eval() if isinstance(gpt2, str) else gpt2
+        self.gpt2: Optional[GPT2Model] = GPT2Model.from_pretrained(gpt2) if isinstance(gpt2, str) else gpt2
+        if self.gpt2 is not None:
+            self.gpt2.eval()
         # Tokenizer
-        tokenizer = tokenizer if tokenizer is not None else (gpt2 if isinstance(gpt2, str) else self.gpt2.config._name_or_path)
-        self.tokenizer: GPT2Tokenizer = GPT2Tokenizer.from_pretrained(tokenizer) if isinstance(tokenizer, str) else tokenizer
+        self.tokenizer: Optional[GPT2Tokenizer] = GPT2Tokenizer.from_pretrained(tokenizer) if isinstance(tokenizer, str) else tokenizer
         # Conditioned speech synthesis gpt2
         if mellotron is not None:
             if isinstance(mellotron, str):
@@ -70,7 +71,7 @@ class ChatSpeechGenerator:
                 self.dgst.load_state_dict(torch.load(dgst))
             else:
                 self.dgst = dgst
-            self.dgst.eval().to(device)
+            self.dgst.eval()
         else:
             self.dgst = None
 
@@ -85,7 +86,10 @@ class ChatSpeechGenerator:
         self.device: torch.device = device if device is not None else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.mixed_precision: bool = mixed_precision and self.device.type == 'cuda'
         # Load internal neural network gpt2 for text analysis
-        self.gpt2 = self.gpt2.to(device)
+        if self.dgst is not None:
+            self.dgst.to(self.device)
+        if self.gpt2 is not None:
+            self.gpt2 = self.gpt2.to(self.device)
 
     def __call__(self, *args, **kwargs):
         return self.generate_speech_response(*args, **kwargs)
@@ -117,8 +121,6 @@ class ChatSpeechGenerator:
     def _predict_gst(
             self, response: str, gst_prediction: Literal['embed', 'score', 'all'] = 'all', dialogue: Optional[Union[str, List[str]]] = None
     ) -> Tuple[Optional[List[float]], Optional[List[List[float]]]]:
-        # Input validation
-        assert self.dgst is not None
         with torch.no_grad(), torch.autocast(self.device.type, enabled=self.mixed_precision):
             # Prepare input hidden states
             hidden_states = self._get_input_hidden_states(response, dialogue=dialogue)
@@ -182,7 +184,7 @@ class ChatSpeechGenerator:
             speaker_id: Optional[int] = None,
     ) -> np.ndarray:
         # Predict GST embedding or scores from text (if required)
-        if gst_prediction is not None:
+        if gst_prediction is not None and self.dgst is not None and self.tokenizer is not None and self.gpt2 is not None:
             with torch.no_grad(), torch.autocast(self.device.type, enabled=self.mixed_precision):
                 gst_embeddings, gst_scores = self._predict_gst(response, gst_prediction, dialogue=dialogue)
         else:
