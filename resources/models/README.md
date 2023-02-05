@@ -15,7 +15,7 @@ Response generation:
   - Small ([link](https://huggingface.co/microsoft/DialoGPT-small));
   - Medium ([link](https://huggingface.co/microsoft/DialoGPT-medium));
   - Large ([link](https://huggingface.co/microsoft/DialoGPT-large));
-  - Therapy-DLDLM ([link](https://polimi365-my.sharepoint.com/:u:/g/personal/10451445_polimi_it/EQ7PspwlveNPnXsB4Bl7T2wBxpa6SGVS3hTaBAEvFatTWA?e=qC8CxS)).
+- Therapy-DLDLM ([link](https://polimi365-my.sharepoint.com/:u:/g/personal/10451445_polimi_it/EQ7PspwlveNPnXsB4Bl7T2wBxpa6SGVS3hTaBAEvFatTWA?e=qC8CxS)).
   
 Please refer to the [Transformers](https://huggingface.co/docs/transformers/index) library by [HuggingFace](https://huggingface.co) for further details on the DialoGPT language models.
 
