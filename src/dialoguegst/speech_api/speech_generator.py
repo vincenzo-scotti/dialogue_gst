@@ -68,7 +68,7 @@ class ChatSpeechGenerator:
                     self.mellotron.gst.stl.attention.num_units,
                     (self.mellotron.gst.stl.attention.num_heads, self.mellotron.gst.stl.embed.size(0))
                 )
-                self.dgst.load_state_dict(torch.load(dgst))
+                self.dgst.load_state_dict(torch.load(dgst, map_location=torch.device('cpu')))
             else:
                 self.dgst = dgst
             self.dgst.eval()
